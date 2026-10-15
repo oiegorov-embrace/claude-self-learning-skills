@@ -48,14 +48,14 @@ strip='def own: (.command // "") | test("skill-learning-reminder\\.sh|skill-revi
     | with_entries(select(.value | length > 0)))
   | if .hooks == {} then del(.hooks) else . end'
 apply() {
-  if jq "$@" "$SETTINGS" > "$SETTINGS.tmp" && jq empty "$SETTINGS.tmp"; then mv "$SETTINGS.tmp" "$SETTINGS"
+  if jq "$@" "$SETTINGS" > "$SETTINGS.tmp" && jq empty "$SETTINGS.tmp"; then cat "$SETTINGS.tmp" > "$SETTINGS"; rm -f "$SETTINGS.tmp"   # in place: keeps a symlink, mode and owner
   else rm -f "$SETTINGS.tmp"; echo "Could not update $SETTINGS; it is unchanged." >&2; exit 1; fi
 }
 
 # --- CLAUDE.md: remove our marked block (on install it is added back) ---
 touch "$MD"
 cp "$MD" "$C/backups/CLAUDE.md.before-self-learning-$STAMP"
-strip_md() { awk -v s="$START" -v e="$END" '$0==s{skip=1;next} $0==e{skip=0;next} !skip' "$MD" > "$MD.tmp" && mv "$MD.tmp" "$MD"; }
+strip_md() { awk -v s="$START" -v e="$END" '$0==s{skip=1;next} $0==e{skip=0;next} !skip' "$MD" > "$MD.tmp" && cat "$MD.tmp" > "$MD" && rm -f "$MD.tmp"; }
 
 if [ "$UNINSTALL" = 1 ]; then
   apply "$strip"

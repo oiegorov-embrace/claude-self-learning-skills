@@ -52,6 +52,7 @@ Expected last line: `Installed self-learning skills in <home>/.claude.` If no gi
 
 The script is idempotent. It backs up `settings.json`, `CLAUDE.md` and any existing hook scripts it replaces to `~/.claude/backups/`, keeps the user's other hooks, never overwrites existing skills, and puts its rules between `<!-- self-learning-skills:start -->` and `<!-- self-learning-skills:end -->` in `CLAUDE.md`.
 If it prints `NOTE: ... already has a '## Self-learning skills' section`, an older manual install exists. The script then adds no marked block (the existing section already has the rules). Tell the user and leave that section as it is.
+It changes only the `hooks` key of `settings.json`, appends its hooks after the user's own, writes through symlinks (dotfiles), and `--uninstall` removes only its own entries. `tests/merge-safety.sh` proves this on a throwaway home; run it first if the user wants proof.
 Don't edit `settings.json` or `CLAUDE.md` by hand.
 
 ## Step 5: verify

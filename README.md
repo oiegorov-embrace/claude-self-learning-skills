@@ -96,6 +96,7 @@ claude-self-learning-skills/
 ├── README.md                          This instruction
 ├── AGENTS.md                          Installation procedure for AI agents
 ├── install.sh                         Installer (section 6)
+├── tests/merge-safety.sh              Proof that the installer merges and does not overwrite
 └── dot-claude/                        Copy of the files for ~/.claude/
     ├── claude-md-block.md             Rules block for ~/.claude/CLAUDE.md
     ├── settings.hooks.json            The hooks part of settings.json
@@ -364,7 +365,16 @@ The installer does these steps:
 4. It adds the rules to `~/.claude/CLAUDE.md` between `<!-- self-learning-skills:start -->` and `<!-- self-learning-skills:end -->`.
 5. It adds the two hooks to `~/.claude/settings.json`. It keeps your other hooks.
 
-**NOTE:** You can run the installer again, for example after an update. It replaces its own hooks and its own rules block. It does not make duplicates.
+**NOTE:** The installer does not replace your settings. It merges into them:
+
+- It changes only the `hooks` key of `settings.json`. All other settings stay the same.
+- It adds its hooks after your hooks. It does not change or remove your hooks.
+- It adds its rules block to the end of `CLAUDE.md`. Your text stays the same.
+- It writes through a symlink. A file that links to a dotfiles folder stays a link.
+- You can run it again, for example after an update. It does not make duplicates.
+- `--uninstall` removes only its own hooks and its own rules block.
+
+To see the proof, type `tests/merge-safety.sh`. The test uses a temporary home folder.
 
 ### 6.4 Make the weekly scheduled task
 
