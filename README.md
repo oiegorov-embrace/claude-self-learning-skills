@@ -146,7 +146,7 @@ This file registers the three hooks of the plugin. Claude Code reads it from the
 
 ### 4.3 `skills/setup/SKILL.md`
 
-This skill makes `~/.claude/skills/` a git repository. It does not change your current skills. It shows the skills without the `created-by` marker and asks which of them the system can manage (section 5.5).
+This skill makes `~/.claude/skills/` a git repository. If `~/.claude/skills/` is already in a git repository, for example a versioned `~/.claude`, the skill uses that repository. All commits include only files in `~/.claude/skills/`. It does not change your current skills. It shows the skills without the `created-by` marker and asks which of them the system can manage (section 5.5).
 Until you do the setup, the plugin does not start reviews. At each session start, Claude tells you to do the setup.
 
 **File:** [`plugins/self-learning-skills/skills/setup/SKILL.md`](plugins/self-learning-skills/skills/setup/SKILL.md)
@@ -316,7 +316,7 @@ It merges into your files. It does not replace them. It writes through symlinks.
 ### 7.1 Test the plugin scripts
 
 1. In the repository folder, type `tests/plugin-mode.sh`.
-2. Make sure that the last line is `19 passed, 0 failed`.
+2. Make sure that the last line is `23 passed, 0 failed`.
 
 The test uses a temporary home folder and a test `claude` program. It does not call a model. It does not change your files.
 

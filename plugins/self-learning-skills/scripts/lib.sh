@@ -14,5 +14,6 @@ manual_also_installed() {
   [ "$MODE" = plugin ] && grep -qsE 'skill-review/stop-hook\.sh|hooks/skill-learning-reminder\.sh' "$HOME/.claude/settings.json"
 }
 
-# Reviews and merges commit to the library, so they wait until it is a git repo.
-library_ready() { [ -d "$SKILLS/.git" ]; }
+# Reviews and merges commit to the library, so they wait until it is inside a git work tree.
+# That can be its own repo or a bigger one (for example a versioned ~/.claude).
+library_ready() { [ -d "$SKILLS" ] && [ "$(git -C "$SKILLS" rev-parse --is-inside-work-tree 2>/dev/null)" = true ]; }

@@ -104,7 +104,7 @@ def main(out_path: str, skills_dir: str, hook: str | None) -> None:
 
         subprocess.run(git + ["add", "-A", "--", "."], check=True)
         subprocess.run(git + ["commit", "-q", "-m",
-                              f"Merge {', '.join(retired)} into {into} (curator)\n\n{reason}"], check=True)
+                              f"Merge {', '.join(retired)} into {into} (curator)\n\n{reason}", "--", "."], check=True)
 
         if hook and os.access(hook, os.X_OK):
             for old in retired:

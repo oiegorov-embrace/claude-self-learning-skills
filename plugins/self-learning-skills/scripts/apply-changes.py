@@ -58,7 +58,7 @@ def main(out_path: str, skills_dir: str) -> None:
     if written:
         git = ["git", "-C", str(root)]
         subprocess.run(git + ["add", "--"] + written, check=True)
-        subprocess.run(git + ["commit", "-q", "-m", f"{summary} (background review)"], check=True)
+        subprocess.run(git + ["commit", "-q", "-m", f"{summary} (background review)", "--"] + written, check=True)
     elif files:
         sys.exit("reviewer proposed changes but none had an allowed path")
     print(summary)

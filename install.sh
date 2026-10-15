@@ -8,16 +8,18 @@
 # Usage:
 #   ./install.sh                                   install or update
 #   ./install.sh --git-name "Name" --git-email e   identity for the skills git repo, if git has none
+#   ./install.sh --adopt name,name|all             let the system manage these existing skills
 #   ./install.sh --uninstall                       remove the hooks and the CLAUDE.md block
 #                                                  (keeps your skills, scripts and logs)
 # The weekly curator schedule is not set here; see AGENTS.md step 6.
 set -euo pipefail
 
-GIT_NAME="" GIT_EMAIL="" UNINSTALL=0
+GIT_NAME="" GIT_EMAIL="" ADOPT="" UNINSTALL=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --git-name) GIT_NAME="$2"; shift 2 ;;
     --git-email) GIT_EMAIL="$2"; shift 2 ;;
+    --adopt) ADOPT="$2"; shift 2 ;;
     --uninstall) UNINSTALL=1; shift ;;
     -h|--help) sed -n '2,12p' "$0"; exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 2 ;;
@@ -82,20 +84,13 @@ done
 [ -d "$B" ] && echo "Backed up replaced scripts to $B" 
 chmod +x "$C/hooks/skill-learning-reminder.sh" "$C/skill-review/"*.sh
 
-# --- skills library: add files only if missing, make it a git repo ---
-[ -f "$C/skills/README.md" ] || cp "$SRC/library/README.md" "$C/skills/"
-[ -f "$C/skills/REDIRECTS.md" ] || cp "$SRC/library/REDIRECTS.md" "$C/skills/"
-if [ ! -d "$C/skills/.git" ]; then
-  git -C "$C/skills" init -q -b main
-  [ -f "$C/skills/.gitignore" ] || printf 'synced/\n.DS_Store\n' > "$C/skills/.gitignore"
-fi
-[ -n "$GIT_NAME" ] && git -C "$C/skills" config user.name "$GIT_NAME"
-[ -n "$GIT_EMAIL" ] && git -C "$C/skills" config user.email "$GIT_EMAIL"
-if [ -z "$(git -C "$C/skills" config user.email || true)" ]; then
-  echo "The skills repo has no git identity. Rerun with --git-name and --git-email." >&2; exit 1
-fi
-git -C "$C/skills" add -A
-git -C "$C/skills" diff --cached --quiet || git -C "$C/skills" commit -q -m "Self-learning skills: install or update library files"
+# --- skills library: shared with the plugin. Uses the git repo the library is already in
+# (its own, or e.g. a versioned ~/.claude), never nests one, and commits only the library.
+ARGS=()
+[ -n "$GIT_NAME" ] && ARGS+=(--git-name "$GIT_NAME")
+[ -n "$GIT_EMAIL" ] && ARGS+=(--git-email "$GIT_EMAIL")
+[ -n "$ADOPT" ] && ARGS+=(--adopt "$ADOPT")
+SKILLS_DIR="$C/skills" bash "$SRC/scripts/setup-library.sh" ${ARGS[@]+"${ARGS[@]}"} | sed 's/^/  /'
 
 # --- CLAUDE.md rules block ---
 strip_md

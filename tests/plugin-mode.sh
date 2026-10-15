@@ -73,5 +73,19 @@ rm -f "$DATA/state/s1.line"
 echo "$stop_input" | "$S/stop-hook.sh"
 ok "with manual install: no review"            '[ ! -f "$DATA/state/s1.line" ]'
 
+# The library sits inside a bigger repo (a versioned ~/.claude) with an unrelated staged change.
+H2=$(mktemp -d); mkdir -p "$H2/.claude/skills/mine"
+printf -- '---\nname: mine\ndescription: x\nmetadata:\n  created-by: self-learning-skills\n---\ny\n' > "$H2/.claude/skills/mine/SKILL.md"
+printf '[user]\n\tname = Test\n\temail = test@example.com\n' > "$H2/.gitconfig"; echo '{}' > "$H2/.claude/settings.json"
+git -C "$H2/.claude" init -q -b main; git -C "$H2/.claude" add -A; HOME=$H2 git -C "$H2/.claude" commit -q -m base
+echo '{"theme":"dark"}' > "$H2/.claude/settings.json"; git -C "$H2/.claude" add settings.json
+HOME=$H2 "$S/setup-library.sh" >/dev/null || echo "setup failed in parent repo"
+ok "parent repo: setup committed only skills" '[ "$(git -C "$H2/.claude" log -1 --format=%s)" = "Self-learning skills: set up the skill library" ] && [ -z "$(git -C "$H2/.claude" show --name-only --format= HEAD | grep -v "^skills/")" ]'
+ok "parent repo: setup makes no nested repo"   '[ ! -e "$H2/.claude/skills/.git" ]'
+echo "{}" > "$H2/review.json"; "$STUB/claude" < /dev/null > "$H2/review.json"
+HOME=$H2 /usr/bin/python3 -I "$S/apply-changes.py" "$H2/review.json" "$H2/.claude/skills" >/dev/null 2>&1
+ok "parent repo: review commits only skills"   '[ -z "$(git -C "$H2/.claude" show --name-only --format= HEAD | grep -v "^skills/")" ] && git -C "$H2/.claude" show --name-only --format= HEAD | grep -q "skills/demo-skill/SKILL.md"'
+ok "parent repo: unrelated staged change kept" 'git -C "$H2/.claude" diff --cached --name-only | grep -qx settings.json'
+
 echo "$pass passed, $fail failed (test home: $H)"
 [ "$fail" = 0 ]

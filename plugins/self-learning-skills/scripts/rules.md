@@ -15,7 +15,7 @@ Personal skills live in `~/.claude/skills/<skill-name>/SKILL.md`. Never write in
 - Keep it generic to the activity. Project-specific facts belong in memory or the project's CLAUDE.md, not in a skill.
 
 **After every create or update:**
-1. Commit it: `git -C ~/.claude/skills add -A . && git -C ~/.claude/skills commit -m "<skill>: <what changed>"`.
+1. Commit it: `git -C ~/.claude/skills add -A -- . && git -C ~/.claude/skills commit -m "<skill>: <what changed>" -- .` (the `-- .` keeps the commit to the skill library when it sits inside a bigger repo).
 2. Tell me in one line, e.g. "Updated skill `code-review`: added step to check migrations first." I'll say so if I disagree.
 
 **Which skills are yours to change.** A skill this system created has `created-by: self-learning-skills` under `metadata:` in its frontmatter; add exactly that to every skill you create:
