@@ -76,7 +76,7 @@ put() {  # put <source> <target-dir>
 }
 put "$SRC/scripts/skill-learning-reminder.sh" "$C/hooks"
 put "$SRC/scripts/lib.sh" "$C/hooks"
-for f in lib.sh stop-hook.sh run-review.sh curate.sh apply-changes.py apply-curation.py review-prompt.md curator-prompt.md on-skill-redirect.example; do
+for f in lib.sh ownership.py stop-hook.sh run-review.sh curate.sh apply-changes.py apply-curation.py review-prompt.md curator-prompt.md on-skill-redirect.example; do
   put "$SRC/scripts/$f" "$C/skill-review"
 done
 [ -d "$B" ] && echo "Backed up replaced scripts to $B" 

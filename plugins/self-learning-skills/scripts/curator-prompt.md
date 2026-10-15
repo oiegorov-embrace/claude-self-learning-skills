@@ -19,7 +19,7 @@ Do NOT merge skills that merely share a domain but describe different activities
   - a `## Changelog` that keeps the merged skills' history and adds today's line: `<date>: Merged <old-name>, <old-name> into this skill (curator).`
 - Support files (`references/`, `templates/`, `scripts/`) of retired skills are moved over by the script; if you reference them, use the paths `references/<file>` etc.
 
-Never touch skills under `synced/` or `.archive/` (they aren't shown to you).
+You are shown only skills created by self-learning-skills (frontmatter `metadata: created-by: self-learning-skills`). Keep that marker in the survivor. Skills the user installed from elsewhere, `synced/` and `.archive/` aren't shown to you; never name them in a merge.
 
 ## Output
 

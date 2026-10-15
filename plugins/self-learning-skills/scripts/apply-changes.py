@@ -9,6 +9,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # -I drops the script dir
+from ownership import add_marker, is_managed  # noqa: E402
+
 ALLOWED = re.compile(r"^[a-z0-9][a-z0-9-]*/(SKILL\.md|(references|templates|scripts)/[A-Za-z0-9._-]+)$")
 
 
@@ -22,6 +25,8 @@ def main(out_path: str, skills_dir: str) -> None:
     files = changes.get("files") or []
 
     root = Path(skills_dir).resolve()
+    new_skills = {str(f.get("path", "")).split("/")[0] for f in files
+                  if str(f.get("path", "")).endswith("/SKILL.md")}
     written = []
     for f in files:
         rel = str(f.get("path", ""))
@@ -32,8 +37,22 @@ def main(out_path: str, skills_dir: str) -> None:
         if root not in target.parents:
             print(f"skipped path outside library: {rel!r}", file=sys.stderr)
             continue
+        skill = root / rel.split("/")[0]
+        if (skill / "SKILL.md").exists() and not is_managed(skill):
+            print(f"skipped skill not created by self-learning-skills: {rel!r}", file=sys.stderr)
+            continue
+        if not (skill / "SKILL.md").exists() and skill.name not in new_skills:
+            print(f"skipped support file for a skill that does not exist: {rel!r}", file=sys.stderr)
+            continue
+        content = str(f.get("content", ""))
+        if rel.endswith("/SKILL.md"):
+            try:
+                content = add_marker(content)
+            except ValueError as e:
+                print(f"skipped {rel!r}: {e}", file=sys.stderr)
+                continue
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(str(f.get("content", "")))
+        target.write_text(content)
         written.append(rel)
 
     if written:

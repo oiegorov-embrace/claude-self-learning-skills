@@ -29,10 +29,12 @@ digest() {   # transcript lines on stdin -> readable conversation
   cat "$CODE/review-prompt.md"
   echo
   echo "<skill-library>"
+  managed=" $(/usr/bin/python3 -I "$CODE/ownership.py" list "$SKILLS" managed | tr '\n' ' ') "
   ( cd "$SKILLS" && for f in REDIRECTS.md */SKILL.md */references/* */templates/* */scripts/*; do
       [ -f "$f" ] || continue
       case "$f" in synced/*|.archive/*) continue ;; esac
-      printf '\n=== FILE: %s ===\n' "$f"; head -c 20000 "$f"
+      tag=""; case "$f" in REDIRECTS.md) ;; *) [[ "$managed" == *" ${f%%/*} "* ]] || tag=" (READ-ONLY: not created by self-learning-skills)" ;; esac
+      printf '\n=== FILE: %s%s ===\n' "$f" "$tag"; head -c 20000 "$f"
     done ) | head -c 150000
   echo "</skill-library>"
   echo

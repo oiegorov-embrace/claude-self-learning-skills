@@ -20,7 +20,9 @@ mkdir "$STATE/curator.lock" 2>/dev/null || exit 0
 trap 'rmdir "$STATE/curator.lock" 2>/dev/null' EXIT
 
 # Fewer than two skills: nothing to merge, skip the model call.
-count=$(cd "$SKILLS" && ls -d */SKILL.md 2>/dev/null | grep -v -e '^synced/' -e '^\.archive/' | wc -l | tr -d ' ')
+# Only skills created by self-learning-skills (metadata created-by marker) are curated.
+managed=" $(/usr/bin/python3 -I "$CODE/ownership.py" list "$SKILLS" managed | tr '\n' ' ') "
+count=$(echo $managed | wc -w | tr -d ' ')
 [ "$count" -ge 2 ] || { echo "$(date) skipped: $count skill(s)" >"$log.skipped"; exit 0; }
 
 {
@@ -31,7 +33,7 @@ count=$(cd "$SKILLS" && ls -d */SKILL.md 2>/dev/null | grep -v -e '^synced/' -e 
   echo "<skill-library>"
   ( cd "$SKILLS" && for f in REDIRECTS.md */SKILL.md */references/* */templates/* */scripts/*; do
       [ -f "$f" ] || continue
-      case "$f" in synced/*|.archive/*) continue ;; esac
+      case "$f" in synced/*|.archive/*) continue ;; REDIRECTS.md) ;; *) [[ "$managed" == *" ${f%%/*} "* ]] || continue ;; esac
       printf '\n=== FILE: %s ===\n' "$f"; head -c 20000 "$f"
     done ) | head -c 300000
   echo "</skill-library>"

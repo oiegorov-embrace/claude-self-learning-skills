@@ -13,7 +13,8 @@ A Claude Code plugin, `self-learning-skills@self-learning-skills`, for all proje
 | `SessionStart` hook | Gives Claude the rules for turning the user's corrections into skills in `~/.claude/skills/`. |
 | `UserPromptSubmit` hook | Adds a one-line "skill check" note to each message, and passes on notes from background reviews. |
 | `Stop` hook + background reviewer | After ~15 work steps, runs a tool-less `claude -p` reviewer in the background that may add or edit skills. **Costs about USD 0.25–0.40 per review with Opus.** |
-| `/self-learning-skills:setup` | One-time: makes `~/.claude/skills/` a git repository (never changes existing skills). |
+| `/self-learning-skills:setup` | One-time: makes `~/.claude/skills/` a git repository and asks which existing skills the system may manage. |
+| Ownership | The system changes only skills marked `metadata: created-by: self-learning-skills`; others stay read-only. |
 | `/self-learning-skills:curate` | On demand or scheduled: merges overlapping skills; old names stay reachable. |
 
 The plugin does not edit `settings.json` or `CLAUDE.md`. Claude Code adds one `extraKnownMarketplaces` entry and one `enabledPlugins` entry. State lives in the plugin data folder, which Claude Code deletes on uninstall; the skill library stays.
@@ -63,7 +64,13 @@ bash "$ROOT/scripts/setup-library.sh" --git-name "<name>" --git-email "<email>" 
 # expect: Skill library ready: <home>/.claude/skills (<n> commits).
 ```
 
-If it prints `No git identity ... Nothing was changed.`, ask the user for a name and email and run the second form. If `ROOT` is empty, tell the user to type `/self-learning-skills:setup` in their next Claude Code session instead.
+If it prints `No git identity ... Nothing was changed.`, ask the user for a name and email and run the second form.
+
+The last line lists read-only skills (no `created-by: self-learning-skills` marker). The reviewer and the curator never change those. Show the list to the user and ask which of them this system created or may manage (typical after a move from a manual install). Adopt only the ones the user names:
+
+```bash
+bash "$ROOT/scripts/setup-library.sh" --adopt <name>,<name>     # or --adopt all, only if the user says all
+``` If `ROOT` is empty, tell the user to type `/self-learning-skills:setup` in their next Claude Code session instead.
 
 **Fallback, only if plugins are blocked** (for example by organization policy): `git clone https://github.com/oiegorov-embrace/claude-self-learning-skills.git && cd claude-self-learning-skills && ./install.sh` (add `--git-name`/`--git-email` if asked). It merges into `settings.json` and `CLAUDE.md` (never replaces), writes through symlinks, is safe to rerun, and `--uninstall` removes only its own entries.
 

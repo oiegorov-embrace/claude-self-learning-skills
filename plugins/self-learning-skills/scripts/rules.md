@@ -18,6 +18,13 @@ Personal skills live in `~/.claude/skills/<skill-name>/SKILL.md`. Never write in
 1. Commit it: `git -C ~/.claude/skills add -A . && git -C ~/.claude/skills commit -m "<skill>: <what changed>"`.
 2. Tell me in one line, e.g. "Updated skill `code-review`: added step to check migrations first." I'll say so if I disagree.
 
+**Which skills are yours to change.** A skill this system created has `created-by: self-learning-skills` under `metadata:` in its frontmatter; add exactly that to every skill you create:
+```
+metadata:
+  created-by: self-learning-skills
+```
+Skills without it were installed from elsewhere (by hand, from a team or a plugin). Read and use them, but don't edit, merge or rename them unless I ask for that skill by name.
+
 **Don't** make a skill for trivia, a single fix, or something already covered. Extend the existing skill instead of making a near-duplicate.
 
 **Background review.** A Stop hook runs a separate background reviewer after every ~15 work steps; it may create or patch skills on its own. When my message carries a "Background skill review" note, tell me in one line what it changed.

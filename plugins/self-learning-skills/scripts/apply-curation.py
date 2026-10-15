@@ -18,6 +18,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # -I drops the script dir
+from ownership import add_marker, is_managed  # noqa: E402
+
 NAME = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 RESERVED = {"synced", ".archive"}
 
@@ -71,8 +74,12 @@ def main(out_path: str, skills_dir: str, hook: str | None) -> None:
         if bad or missing or not retired:
             print(f"skipped merge into {into!r}: bad={bad} missing={missing}", file=sys.stderr)
             continue
+        foreign = [n for n in retired + [into] if (root / n / "SKILL.md").is_file() and not is_managed(root / n)]
+        if foreign:
+            print(f"skipped merge into {into!r}: not created by self-learning-skills: {foreign}", file=sys.stderr)
+            continue
         try:
-            content = ensure_alias(str(merge.get("content", "")), retired)
+            content = add_marker(ensure_alias(str(merge.get("content", "")), retired))
         except ValueError as e:
             print(f"skipped merge into {into!r}: {e}", file=sys.stderr)
             continue

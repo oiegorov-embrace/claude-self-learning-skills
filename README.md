@@ -19,6 +19,7 @@ claude plugin install self-learning-skills --marketplace oiegorov-embrace/claude
 | Scope | All your Claude Code projects. Your skills go to `~/.claude/skills/`. |
 | Cost | Each background review costs approximately USD 0.25 to 0.40 with Opus. |
 | Your settings | The plugin does not edit `settings.json` or `CLAUDE.md`. Claude Code adds only the marketplace entry and the plugin entry. |
+| Your other skills | The system changes only the skills that it made. Skills from other sources stay as they are. |
 | Removal | `claude plugin uninstall self-learning-skills@self-learning-skills`. Your skills stay. |
 
 The full instruction follows.
@@ -145,7 +146,7 @@ This file registers the three hooks of the plugin. Claude Code reads it from the
 
 ### 4.3 `skills/setup/SKILL.md`
 
-This skill makes `~/.claude/skills/` a git repository. It does not change your current skills.
+This skill makes `~/.claude/skills/` a git repository. It does not change your current skills. It shows the skills without the `created-by` marker and asks which of them the system can manage (section 5.5).
 Until you do the setup, the plugin does not start reviews. At each session start, Claude tells you to do the setup.
 
 **File:** [`plugins/self-learning-skills/skills/setup/SKILL.md`](plugins/self-learning-skills/skills/setup/SKILL.md)
@@ -170,8 +171,9 @@ This skill starts the curator. Only you or a schedule can start it. Claude does 
 | [`apply-changes.py`](plugins/self-learning-skills/scripts/apply-changes.py) | Writes only to permitted paths in the skill library. Makes a commit. |
 | [`curate.sh`](plugins/self-learning-skills/scripts/curate.sh) | Starts the curator. With fewer than two skills, it stops and does not call the model. |
 | [`curator-prompt.md`](plugins/self-learning-skills/scripts/curator-prompt.md) | The curator instructions. |
-| [`apply-curation.py`](plugins/self-learning-skills/scripts/apply-curation.py) | Does each merge (section 5.5). |
-| [`setup-library.sh`](plugins/self-learning-skills/scripts/setup-library.sh) | Makes the skill library a git repository. |
+| [`apply-curation.py`](plugins/self-learning-skills/scripts/apply-curation.py) | Does each merge (section 5.6). |
+| [`setup-library.sh`](plugins/self-learning-skills/scripts/setup-library.sh) | Makes the skill library a git repository. Adopts the skills that you name. |
+| [`ownership.py`](plugins/self-learning-skills/scripts/ownership.py) | Finds and adds the `created-by` marker. |
 | [`on-skill-redirect.example`](plugins/self-learning-skills/scripts/on-skill-redirect.example) | Optional link to an external memory, for example Hindsight. |
 
 A work step is one Claude response that uses one or more tools. Many tools in one response are one step.
@@ -231,7 +233,21 @@ flowchart TD
 
 **NOTE:** A review takes approximately 40 to 60 seconds. With Opus 5.5, it costs approximately USD 0.25 to 0.40.
 
-### 5.5 How old skill names continue to work
+### 5.5 Which skills the system can change
+
+The system changes only the skills that it made. Each of these skills has this marker in its front matter:
+
+```yaml
+metadata:
+  created-by: self-learning-skills
+```
+
+- The reviewer, the curator and Claude add the marker to each new skill.
+- Skills without the marker are read-only to the system. Claude reads and uses them, but it does not change or merge them. It changes them only when you name the skill.
+- The scripts reject a change to an unmarked skill. A prompt alone does not give this protection.
+- At setup, you can adopt existing skills that this system made, for example after a manual installation. Type `/self-learning-skills:setup` and name the skills, or use `setup-library.sh --adopt <name>,<name>`.
+
+### 5.6 How old skill names continue to work
 
 The curator merges skills. These items keep each old name available:
 
@@ -300,7 +316,7 @@ It merges into your files. It does not replace them. It writes through symlinks.
 ### 7.1 Test the plugin scripts
 
 1. In the repository folder, type `tests/plugin-mode.sh`.
-2. Make sure that the last line is `14 passed, 0 failed`.
+2. Make sure that the last line is `19 passed, 0 failed`.
 
 The test uses a temporary home folder and a test `claude` program. It does not call a model. It does not change your files.
 
