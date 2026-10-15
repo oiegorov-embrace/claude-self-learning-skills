@@ -1,0 +1,12 @@
+#!/bin/bash
+# Called by apply-curation.py once per retired skill: on-skill-redirect <old> <new> <date> <reason>
+# To enable: copy to on-skill-redirect, fill in the external-memory call, chmod +x.
+# Example for a local Hindsight server (check the current Hindsight API before using):
+#
+#   curl -s -X POST "http://localhost:8888/v1/default/banks/<bank-id>/memories" \
+#     -H 'Content-Type: application/json' \
+#     -d "$(jq -n --arg t "Skill '$1' was merged into '$2' on $3 ($4). Use skill '$2' instead of '$1'." \
+#           '{items: [{content: $t}]}')"
+
+old="$1"; new="$2"; day="$3"; reason="$4"
+echo "$day redirect $old -> $new ($reason)" >>"$HOME/.claude/skill-review/logs/redirects.log"
