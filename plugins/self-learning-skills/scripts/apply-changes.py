@@ -44,6 +44,9 @@ def main(out_path: str, skills_dir: str) -> None:
         if not (skill / "SKILL.md").exists() and skill.name not in new_skills:
             print(f"skipped support file for a skill that does not exist: {rel!r}", file=sys.stderr)
             continue
+        if target.is_file() and target.stat().st_size > 100000:
+            print(f"skipped {rel!r}: over 100000 bytes, the reviewer saw only part of it", file=sys.stderr)
+            continue
         content = str(f.get("content", ""))
         if rel.endswith("/SKILL.md"):
             try:

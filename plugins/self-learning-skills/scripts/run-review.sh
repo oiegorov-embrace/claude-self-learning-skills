@@ -34,8 +34,11 @@ digest() {   # transcript lines on stdin -> readable conversation
       [ -f "$f" ] || continue
       case "$f" in synced/*|.archive/*) continue ;; esac
       tag=""; case "$f" in REDIRECTS.md) ;; *) [[ "$managed" == *" ${f%%/*} "* ]] || tag=" (READ-ONLY: not created by self-learning-skills)" ;; esac
-      printf '\n=== FILE: %s%s ===\n' "$f" "$tag"; head -c 20000 "$f"
-    done ) | head -c 150000
+      # Files are shown whole up to 100 KB; a bigger file is cut and marked, and
+      # apply-changes.py refuses to rewrite it (a rewrite from a partial view loses content).
+      [ "$(wc -c < "$f")" -gt 100000 ] && tag="$tag (TRUNCATED at 100000 bytes: do not rewrite this file)"
+      printf '\n=== FILE: %s%s ===\n' "$f" "$tag"; head -c 100000 "$f"
+    done ) | head -c 400000
   echo "</skill-library>"
   echo
   echo "<transcript>"

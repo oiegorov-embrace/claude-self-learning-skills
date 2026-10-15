@@ -34,8 +34,9 @@ count=$(echo $managed | wc -w | tr -d ' ')
   ( cd "$SKILLS" && for f in REDIRECTS.md */SKILL.md */references/* */templates/* */scripts/*; do
       [ -f "$f" ] || continue
       case "$f" in synced/*|.archive/*) continue ;; REDIRECTS.md) ;; *) [[ "$managed" == *" ${f%%/*} "* ]] || continue ;; esac
-      printf '\n=== FILE: %s ===\n' "$f"; head -c 20000 "$f"
-    done ) | head -c 300000
+      [ "$(wc -c < "$f")" -gt 100000 ] && continue   # never merge a skill the curator can't see whole
+      printf '\n=== FILE: %s ===\n' "$f"; cat "$f"
+    done ) | head -c 400000
   echo "</skill-library>"
 } >"$log.prompt.txt"
 
