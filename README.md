@@ -49,7 +49,7 @@ This design copies the "learning loop" of Hermes Agent (Nous Research).
 | Rules | `~/.claude/CLAUDE.md` | Each session | Tells Claude how to make and change skills. |
 | Skill library | `~/.claude/skills/` (git repository) | Always | Keeps the skills and their history. |
 | Reminder hook | `UserPromptSubmit` hook | Each user message | Reminds Claude of the rules. Gives Claude the notes from background work. |
-| Review trigger | `Stop` hook | After each Claude reply | Counts tool calls. At 15 tool calls, starts the reviewer. |
+| Review trigger | `Stop` hook | After each Claude reply | Counts work steps. At 15 work steps, starts the reviewer. |
 | Reviewer | Headless `claude -p`, no tools | In the background | Examines the session. Writes skill changes as JSON. |
 | Apply script | Python | After the reviewer | Writes the JSON changes to the skill library. Makes a commit. |
 | Curator | Headless `claude -p`, no tools | Each Monday 10:00 | Finds skills that are almost the same. Writes merges as JSON. |
@@ -140,7 +140,10 @@ It also moves the notes of the reviewer and the curator from `notices.pending` t
 ### 4.4 `~/.claude/skill-review/stop-hook.sh`
 
 This hook operates after each Claude reply.
-It counts the tool calls since the last review. At 15, it starts `run-review.sh` in the background.
+It counts the work steps since the last review. At 15, it starts `run-review.sh` in the background.
+A work step is one Claude response that uses one or more tools. Many tools in one response are one step.
+All tools count, MCP tools also. The hook ignores bookkeeping tools: `mcp__ccd_turn__*` and `ToolSearch`.
+You do not add tool names to the script. A new MCP tool counts automatically.
 If Claude changed a skill in that period, the hook sets the count to zero. It does not start a review.
 
 **File:** [`dot-claude/skill-review/stop-hook.sh`](dot-claude/skill-review/stop-hook.sh)
@@ -228,7 +231,7 @@ flowchart TD
   R --> C[Claude does the task]
   C -->|You correct a step| S1[Claude changes the skill and makes a commit]
   C --> F[Claude finishes the reply]
-  F --> SH[Stop hook counts tool calls]
+  F --> SH[Stop hook counts work steps]
   SH -->|Fewer than 15| E[Nothing more]
   SH -->|15 or more| BG[Reviewer starts in the background]
   BG --> J[Reviewer writes skill changes as JSON]
@@ -251,7 +254,8 @@ flowchart TD
 ### 5.3 Sequence after each reply (background review)
 
 1. Claude finishes the reply. The `Stop` hook starts.
-2. The hook reads the session transcript. It counts the tool calls after the last review position.
+2. The hook reads the session transcript. It counts the work steps after the last review position.
+   It does not count bookkeeping tools.
 3. If Claude changed a skill in that period, the hook moves the review position and stops.
 4. If the count is less than 15, the hook stops.
 5. If the count is 15 or more, the hook moves the review position. It starts `run-review.sh` in the background. The hook stops immediately.
@@ -391,7 +395,7 @@ echo '{}' | ~/.claude/hooks/skill-learning-reminder.sh | jq .
 
 ### 7.2 Test the background review
 
-1. Do a task in a session with 15 or more tool calls. Correct Claude at least one time.
+1. Do a task in a session with 15 or more work steps. Correct Claude at least one time.
 2. Wait approximately one minute after the reply.
 3. Send a new message.
 4. Make sure that Claude tells you about a "Background skill review" change.
@@ -420,7 +424,8 @@ SKILLS_DIR=<test-folder> NOTICES=<test-folder>/notices ~/.claude/skill-review/cu
 
 | Setting | Where | Default | Effect |
 | --- | --- | --- | --- |
-| `SKILL_REVIEW_THRESHOLD` | Environment variable | `15` | Number of tool calls before a review |
+| `SKILL_REVIEW_THRESHOLD` | Environment variable | `15` | Number of work steps before a review |
+| `SKILL_REVIEW_IGNORE_TOOLS` | Environment variable | `^(mcp__ccd_turn__.*\|ToolSearch)$` | Regular expression. The hook does not count the tools that agree with it. |
 | `SKILL_REVIEW_MODEL` | Environment variable | `claude-opus-5-5` | Model for the reviewer. `claude-sonnet-5-5` costs less. |
 | `CURATOR_MODEL` | Environment variable | `claude-opus-5-5` | Model for the curator |
 | Schedule | Claude app, **Scheduled** | Monday 10:00 | Time of the curator run |
