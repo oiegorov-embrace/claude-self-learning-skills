@@ -39,12 +39,16 @@ git clone https://github.com/oiegorov-embrace/claude-self-learning-skills.git
 cd claude-self-learning-skills
 ```
 
+Any folder works; the installer copies what it needs into `~/.claude/`. Keep the clone for `./install.sh --uninstall` and for updates (`git pull && ./install.sh`).
+
 ## Step 4: install
 
 ```bash
 ./install.sh                                              # git identity already set globally
 ./install.sh --git-name "<name>" --git-email "<email>"    # otherwise
 ```
+
+Expected last line: `Installed self-learning skills in <home>/.claude.` If no git identity is available, it prints `No git identity ... Nothing was changed.` and exits; ask the user for name and email and rerun.
 
 The script is idempotent. It backs up `settings.json`, `CLAUDE.md` and any existing hook scripts it replaces to `~/.claude/backups/`, keeps the user's other hooks, never overwrites existing skills, and puts its rules between `<!-- self-learning-skills:start -->` and `<!-- self-learning-skills:end -->` in `CLAUDE.md`.
 If it prints `NOTE: ... already has a '## Self-learning skills' section`, an older manual install exists. The script then adds no marked block (the existing section already has the rules). Tell the user and leave that section as it is.
@@ -64,8 +68,12 @@ grep -c 'self-learning-skills:start' ~/.claude/CLAUDE.md   # expect: 1; expect 0
 Use the day and time from step 1. Use the first option that you can do.
 
 1. **You have a scheduled-task tool (Claude desktop app):** create a task named `weekly-skill-curator`, with the prompt from `dot-claude/scheduled-tasks/weekly-skill-curator/SKILL.md` (the text below its front matter) and the cron expression for the chosen time (default `0 10 * * 1`). It runs while the app is open, and a missed run starts when the app opens.
-2. **Otherwise:** add this line to the user's crontab (`crontab -e`), with the chosen time:
-   `0 10 * * 1 /bin/bash "$HOME/.claude/skill-review/curate.sh"`
+2. **Otherwise:** add a crontab line with the chosen time (this keeps existing entries and adds no duplicate):
+   ```bash
+   LINE='0 10 * * 1 /bin/bash "$HOME/.claude/skill-review/curate.sh"'
+   crontab -l 2>/dev/null | grep -qF 'skill-review/curate.sh' || ( crontab -l 2>/dev/null; echo "$LINE" ) | crontab -
+   crontab -l | grep curate.sh   # expect: the line above
+   ```
 3. **Neither is possible:** tell the user to run `~/.claude/skill-review/curate.sh` by hand now and then.
 
 ## Step 7: report to the user
@@ -76,7 +84,7 @@ Tell the user, briefly:
 2. That background reviews cost about USD 0.25–0.40 each, and that `SKILL_REVIEW_MODEL=claude-sonnet-5-5` makes them cheaper.
 3. Whether and when the curator runs.
 4. How to undo a skill change: `git -C ~/.claude/skills revert <commit>`.
-5. How to remove the system: `./install.sh --uninstall` (keeps skills and logs), then remove the curator schedule: delete the `weekly-skill-curator` scheduled task in the Claude app, or delete the `curate.sh` line with `crontab -e`.
+5. How to remove the system: `./install.sh --uninstall` (keeps skills and logs), then remove the curator schedule: delete the `weekly-skill-curator` scheduled task in the Claude app, or remove the cron line: `crontab -l | grep -vF 'skill-review/curate.sh' | crontab -`.
 
 ## Rules for you
 
