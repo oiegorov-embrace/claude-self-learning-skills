@@ -1,7 +1,8 @@
 #!/bin/bash
 # Installer for self-learning skills. Installs into ~/.claude (all projects of this user).
 # Safe to run again: it replaces its own hook entries and its own CLAUDE.md block instead of
-# adding duplicates, never overwrites your skills, and backs up settings.json and CLAUDE.md.
+# adding duplicates, never overwrites your skills, and backs up settings.json, CLAUDE.md and
+# any changed hook scripts it replaces.
 #
 # Usage:
 #   ./install.sh                                   install or update
@@ -65,10 +66,18 @@ if [ "$UNINSTALL" = 1 ]; then
 fi
 
 # --- scripts (state/, logs/, notices and your on-skill-redirect are never touched) ---
-cp "$REPO/hooks/skill-learning-reminder.sh" "$C/hooks/"
+# A script that exists and differs from the repo copy is backed up before it is replaced.
+B="$C/backups/self-learning-scripts-$STAMP"
+put() {  # put <source> <target-dir>
+  local t="$2/$(basename "$1")"
+  if [ -f "$t" ] && ! cmp -s "$1" "$t"; then mkdir -p "$B/$(basename "$2")"; cp "$t" "$B/$(basename "$2")/"; fi
+  cp "$1" "$2/"
+}
+put "$REPO/hooks/skill-learning-reminder.sh" "$C/hooks"
 for f in stop-hook.sh run-review.sh curate.sh apply-changes.py apply-curation.py review-prompt.md curator-prompt.md on-skill-redirect.example; do
-  cp "$REPO/skill-review/$f" "$C/skill-review/"
+  put "$REPO/skill-review/$f" "$C/skill-review"
 done
+[ -d "$B" ] && echo "Backed up replaced scripts to $B" 
 chmod +x "$C/hooks/skill-learning-reminder.sh" "$C/skill-review/"*.sh
 
 # --- skills library: add files only if missing, make it a git repo ---

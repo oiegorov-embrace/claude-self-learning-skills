@@ -6,7 +6,7 @@ A background reviewer finds the corrections that Claude did not record. A weekly
 
 **Install with an AI agent.** Give your agent this text:
 
-> Set up https://github.com/oiegorov-embrace/claude-self-learning-skills for me. Follow its AGENTS.md.
+> Set up https://github.com/oiegorov-embrace/claude-self-learning-skills for me. Read and follow https://raw.githubusercontent.com/oiegorov-embrace/claude-self-learning-skills/main/AGENTS.md
 
 **Install yourself.** Type these commands in a terminal:
 
@@ -358,7 +358,7 @@ cd claude-self-learning-skills
 
 The installer does these steps:
 
-1. It makes backups of `settings.json` and `CLAUDE.md` in `~/.claude/backups/`.
+1. It makes backups of `settings.json`, `CLAUDE.md` and each changed script that it replaces. The backups go to `~/.claude/backups/`.
 2. It copies the hook and the scripts to `~/.claude/hooks/` and `~/.claude/skill-review/`.
 3. It makes `~/.claude/skills/` a git repository. It does not change your current skills.
 4. It adds the rules to `~/.claude/CLAUDE.md` between `<!-- self-learning-skills:start -->` and `<!-- self-learning-skills:end -->`.
