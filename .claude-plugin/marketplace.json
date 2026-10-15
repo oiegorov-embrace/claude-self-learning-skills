@@ -1,0 +1,14 @@
+{
+  "name": "self-learning-skills",
+  "owner": {
+    "name": "oiegorov-embrace"
+  },
+  "description": "Self-learning personal skills for Claude Code",
+  "plugins": [
+    {
+      "name": "self-learning-skills",
+      "source": "./plugins/self-learning-skills",
+      "description": "Turns your corrections into personal skills, with a background reviewer and a curator. Run /self-learning-skills:setup once after install."
+    }
+  ]
+}

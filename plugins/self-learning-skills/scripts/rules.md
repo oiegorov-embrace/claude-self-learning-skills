@@ -1,5 +1,3 @@
-# Personal instructions (all projects)
-
 ## Self-learning skills
 
 I want my way of working captured as skills, so that when I hand you a task you approach it the way I would. You're not limited to a skill, but go through its steps as I do.
@@ -22,12 +20,12 @@ Personal skills live in `~/.claude/skills/<skill-name>/SKILL.md`. Never write in
 
 **Don't** make a skill for trivia, a single fix, or something already covered. Extend the existing skill instead of making a near-duplicate.
 
-**Background review.** A Stop hook (`~/.claude/skill-review/`) runs a separate reviewer after every ~15 tool calls; it may create or patch skills on its own. When my message carries a "Background skill review" note, tell me in one line what it changed.
+**Background review.** A Stop hook runs a separate background reviewer after every ~15 work steps; it may create or patch skills on its own. When my message carries a "Background skill review" note, tell me in one line what it changed.
 
 ### Merging, renaming and retiring skills
 
 Old skill names live on in my memory and in any external memory (e.g. Hindsight) that recalls "I used skill X". So a skill name must never just disappear:
-- Merge or rename only when I ask, or in a dedicated curator pass (`~/.claude/skill-review/curate.sh`, run weekly; it applies all the steps below automatically). Never during normal work or a background review.
+- Merge or rename only when I ask, or in a dedicated curator pass (the weekly curator: `/self-learning-skills:curate` for a plugin install, `~/.claude/skill-review/curate.sh` for a manual install; it applies all the steps below automatically). Never during normal work or a background review.
 - Move the old folder to `~/.claude/skills/.archive/<old-name>/`; never delete it.
 - Add the old name to the surviving skill's `description` as an alias ("Formerly: review-investment-signals"), so a request in the old words still matches.
 - Append `old-name → new-name (date, reason)` to `~/.claude/skills/REDIRECTS.md`.

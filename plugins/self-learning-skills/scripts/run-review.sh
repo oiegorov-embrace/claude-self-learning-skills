@@ -6,12 +6,11 @@
 # Usage: run-review.sh <session_id> <transcript_path> <last_reviewed_line>
 
 sid="$1"; tp="$2"; last="${3:-0}"
-BASE="$HOME/.claude/skill-review"
-SKILLS="$HOME/.claude/skills"
+. "$(dirname "$0")/lib.sh"
 MODEL="${SKILL_REVIEW_MODEL:-claude-opus-5-5}"
 CLAUDE_BIN="$(command -v claude || echo "$HOME/.local/bin/claude")"
-log="$BASE/logs/$(date +%Y%m%d-%H%M%S)-$sid"
-trap 'rmdir "$BASE/state/$sid.lock" 2>/dev/null' EXIT
+log="$STATE/logs/$(date +%Y%m%d-%H%M%S)-$sid"
+trap 'rmdir "$STATE/state/$sid.lock" 2>/dev/null' EXIT
 
 digest() {   # transcript lines on stdin -> readable conversation
   jq -R -r 'fromjson? | select(.isSidechain | not) |
@@ -27,7 +26,7 @@ digest() {   # transcript lines on stdin -> readable conversation
 }
 
 {
-  cat "$BASE/review-prompt.md"
+  cat "$CODE/review-prompt.md"
   echo
   echo "<skill-library>"
   ( cd "$SKILLS" && for f in REDIRECTS.md */SKILL.md */references/* */templates/* */scripts/*; do
@@ -53,8 +52,8 @@ SKILL_REVIEWER=1 "$CLAUDE_BIN" -p \
   --output-format json \
   <"$log.prompt.txt" >"$log.json" 2>"$log.err"
 
-if summary=$(/usr/bin/python3 -I "$BASE/apply-changes.py" "$log.json" "$SKILLS" 2>>"$log.err"); then
-  [ "$summary" != "Nothing to save." ] && echo "$(date '+%Y-%m-%d %H:%M')	$summary" >>"$BASE/notices.pending"
+if summary=$(/usr/bin/python3 -I "$CODE/apply-changes.py" "$log.json" "$SKILLS" 2>>"$log.err"); then
+  [ "$summary" != "Nothing to save." ] && echo "$(date '+%Y-%m-%d %H:%M')	$summary" >>"$STATE/notices.pending"
 else
-  echo "$(date '+%Y-%m-%d %H:%M')	Background skill review failed; see $log.err" >>"$BASE/notices.pending"
+  echo "$(date '+%Y-%m-%d %H:%M')	Background skill review failed; see $log.err" >>"$STATE/notices.pending"
 fi

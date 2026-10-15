@@ -1,26 +1,25 @@
 # Self-Learning Skills for Claude Code
 
 Claude Code forgets your corrections when a session ends.
-This system writes each correction into a skill. All future sessions use the skill.
-A background reviewer finds the corrections that Claude did not record. A weekly curator merges similar skills.
+This plugin writes each correction into a skill. All future sessions use the skill.
+A background reviewer finds the corrections that Claude did not record. A curator merges similar skills.
 
 **Install with an AI agent.** Give your agent this text:
 
 > Set up https://github.com/oiegorov-embrace/claude-self-learning-skills for me. Read and follow https://raw.githubusercontent.com/oiegorov-embrace/claude-self-learning-skills/main/AGENTS.md
 
-**Install yourself.** Type these commands in a terminal:
+**Install yourself.** Type this command in a terminal, then start Claude Code and type `/self-learning-skills:setup`:
 
 ```bash
-git clone https://github.com/oiegorov-embrace/claude-self-learning-skills.git
-cd claude-self-learning-skills && ./install.sh
+claude plugin install self-learning-skills --marketplace oiegorov-embrace/claude-self-learning-skills
 ```
 
 | Before you install | Detail |
 | --- | --- |
-| Scope | All your Claude Code projects. The system changes files in `~/.claude/` only. |
+| Scope | All your Claude Code projects. Your skills go to `~/.claude/skills/`. |
 | Cost | Each background review costs approximately USD 0.25 to 0.40 with Opus. |
-| Your files | The installer makes backups. It keeps your other hooks and your skills. You can run it again. |
-| Removal | `./install.sh --uninstall` |
+| Your settings | The plugin does not edit `settings.json` or `CLAUDE.md`. Claude Code adds only the marketplace entry and the plugin entry. |
+| Removal | `claude plugin uninstall self-learning-skills@self-learning-skills`. Your skills stay. |
 
 The full instruction follows.
 
@@ -29,10 +28,11 @@ The full instruction follows.
 # Setup Instruction
 
 > **Language:** This document uses ASD-STE100 Simplified Technical English.
-> The files in the `dot-claude/` folder are in normal English. Claude reads those files, not people.
+> The files in the `plugins/` folder are in normal English. Claude reads those files, not people.
+> Code, commands and file contents stay as they are.
 
 **Applicability:** Claude Code CLI and the Code tab of the Claude desktop app, on macOS. Linux is not tested.
-**Status:** The system was tested on 2026-10-15 with Claude Code 2.1.300. The installer was tested on a test home folder.
+**Status:** The system was tested on 2026-10-15 with Claude Code 2.1.300. The plugin install, the setup and the review pipeline were tested in a temporary home folder.
 
 ---
 
@@ -55,7 +55,7 @@ The system makes and changes skills automatically:
 
 - During a session, Claude adds your corrections to the applicable skill.
 - After a long part of work, a separate reviewer examines the session. It adds the lessons that Claude did not record.
-- One time each week, a curator merges skills that are almost the same.
+- When you start it, a curator merges skills that are almost the same. You can schedule it one time each week.
 - When the curator merges skills, the old skill names continue to work.
 
 This design copies the "learning loop" of Hermes Agent (Nous Research).
@@ -74,184 +74,109 @@ This design copies the "learning loop" of Hermes Agent (Nous Research).
 
 | Component | Type | When it operates | What it does |
 | --- | --- | --- | --- |
-| Rules | `~/.claude/CLAUDE.md` | Each session | Tells Claude how to make and change skills. |
-| Skill library | `~/.claude/skills/` (git repository) | Always | Keeps the skills and their history. |
+| Rules hook | `SessionStart` hook | Each session start and each compaction | Gives Claude the rules for skills. |
 | Reminder hook | `UserPromptSubmit` hook | Each user message | Reminds Claude of the rules. Gives Claude the notes from background work. |
 | Review trigger | `Stop` hook | After each Claude reply | Counts work steps. At 15 work steps, starts the reviewer. |
 | Reviewer | Headless `claude -p`, no tools | In the background | Examines the session. Writes skill changes as JSON. |
 | Apply script | Python | After the reviewer | Writes the JSON changes to the skill library. Makes a commit. |
-| Curator | Headless `claude -p`, no tools | Each Monday 10:00 | Finds skills that are almost the same. Writes merges as JSON. |
-| Merge script | Python | After the curator | Merges skills. Keeps old names in aliases and in `REDIRECTS.md`. |
-| Scheduled task | Claude app scheduled task | Each Monday 10:00 | Starts the curator. |
+| Setup skill | `/self-learning-skills:setup` | One time, after the installation | Makes the skill library a git repository. |
+| Curator skill | `/self-learning-skills:curate` | When you start it, or from a schedule | Finds skills that are almost the same. Merges them. Keeps the old names. |
+| Skill library | `~/.claude/skills/` (git repository) | Always | Keeps the skills and their history. |
 
 ---
 
 ## 3. File hierarchy
 
-This repository has a `dot-claude/` folder. Its structure agrees with `~/.claude/` on your computer.
-Section 4 gives a link to each file.
+This repository is a Claude Code plugin marketplace with the name `self-learning-skills`. It has one plugin.
 
 ```text
 claude-self-learning-skills/
-├── README.md                          This instruction
-├── AGENTS.md                          Installation procedure for AI agents
-├── install.sh                         Installer (section 6)
-├── tests/merge-safety.sh              Proof that the installer merges and does not overwrite
-└── dot-claude/                        Copy of the files for ~/.claude/
-    ├── claude-md-block.md             Rules block for ~/.claude/CLAUDE.md
-    ├── settings.hooks.json            The hooks part of settings.json
-    ├── hooks/
-    ├── skill-review/
+├── README.md                              This instruction
+├── AGENTS.md                              Installation procedure for AI agents
+├── install.sh                             Manual installer, if you cannot use plugins (section 6.3)
+├── tests/
+│   ├── plugin-mode.sh                     Offline test of the plugin scripts (section 7.1)
+│   └── merge-safety.sh                    Proof that install.sh merges and does not overwrite (section 7.2)
+├── .claude-plugin/marketplace.json        The marketplace (section 4.1)
+└── plugins/self-learning-skills/
+    ├── .claude-plugin/plugin.json
+    ├── hooks/hooks.json                   The three hooks (section 4.2)
     ├── skills/
-    └── scheduled-tasks/
+    │   ├── setup/SKILL.md                 /self-learning-skills:setup (section 4.3)
+    │   └── curate/SKILL.md                /self-learning-skills:curate (section 4.4)
+    ├── library/                           README.md and REDIRECTS.md for a new skill library
+    └── scripts/                           The scripts and prompts (section 4.5)
 ```
 
-On your computer, the system uses these files:
+On your computer, the plugin uses these folders:
 
 ```text
-~/.claude/
-├── CLAUDE.md                          Rules for all sessions (section 4.1)
-├── settings.json                      Hook registration (section 4.2)
-├── hooks/
-│   └── skill-learning-reminder.sh     Reminder hook (section 4.3)
-├── skill-review/
-│   ├── stop-hook.sh                   Review trigger (section 4.4)
-│   ├── run-review.sh                  Reviewer runner (section 4.5)
-│   ├── review-prompt.md               Reviewer instructions (section 4.6)
-│   ├── apply-changes.py               Apply script (section 4.7)
-│   ├── curate.sh                      Curator runner (section 4.8)
-│   ├── curator-prompt.md              Curator instructions (section 4.9)
-│   ├── apply-curation.py              Merge script (section 4.10)
-│   ├── on-skill-redirect.example      External memory link, optional (section 4.11)
-│   ├── state/                         Made automatically: review position per session
-│   ├── logs/                          Made automatically: one log set per run
-│   ├── notices.pending                Made automatically: notes not yet shown
-│   └── notices.seen                   Made automatically: notes already shown
-├── skills/                            Git repository
-│   ├── README.md                      (section 4.12)
-│   ├── REDIRECTS.md                   Old name → new name table (section 4.13)
-│   ├── <skill-name>/SKILL.md          Made by Claude, the reviewer or the curator
-│   ├── .archive/                      Made automatically: merged skills
-│   └── synced/                        Made by claude.ai sync. Do not change.
-└── scheduled-tasks/
-    └── weekly-skill-curator/
-        └── SKILL.md                   Made by the Claude app (section 4.14)
+~/.claude/skills/                                       Your skill library (git repository)
+├── <skill-name>/SKILL.md                               Made by Claude, the reviewer or the curator
+├── REDIRECTS.md                                        Old name → new name table
+├── .archive/                                           Merged skills
+└── synced/                                             Made by claude.ai sync. Do not change.
+~/.claude/plugins/data/self-learning-skills-self-learning-skills/
+├── state/                                              Review position for each session
+├── logs/                                               One log set for each review or curator run
+├── notices.pending                                     Notes not yet shown
+└── notices.seen                                        Notes already shown
 ```
+
+**NOTE:** Claude Code deletes the plugin data folder when you uninstall the plugin. Your skill library stays.
 
 ---
 
 ## 4. Files
 
-Each file is in the `dot-claude/` folder of this repository. Its path agrees with its path under `~/.claude/`.
-
 **CAUTION:** Do not write files into `~/.claude/skills/synced/`. The claude.ai sync replaces the files in that folder.
 
-### 4.1 `~/.claude/CLAUDE.md`
+### 4.1 `.claude-plugin/marketplace.json`
 
-Claude reads this file at the start of each session in each project.
-It has the rules for skills. The installer adds this text to the file between two marker lines.
-The file in this repository does not have the name `CLAUDE.md`. Thus, an agent that works in this repository does not read it as instructions.
+This file makes the repository a plugin marketplace.
 
-**File:** [`dot-claude/claude-md-block.md`](dot-claude/claude-md-block.md)
+**File:** [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json)
 
-### 4.2 `~/.claude/settings.json` (hooks part)
+### 4.2 `hooks/hooks.json`
 
-This part registers the two hooks. Add the `hooks` key to your current settings.
-Do not remove the other keys in the file.
+This file registers the three hooks of the plugin. Claude Code reads it from the plugin. It does not copy it into `settings.json`.
 
-**File:** [`dot-claude/settings.hooks.json`](dot-claude/settings.hooks.json)
+**File:** [`plugins/self-learning-skills/hooks/hooks.json`](plugins/self-learning-skills/hooks/hooks.json)
 
-### 4.3 `~/.claude/hooks/skill-learning-reminder.sh`
+### 4.3 `skills/setup/SKILL.md`
 
-This hook operates when you send a message.
-It adds a short reminder to your message. Only Claude sees the reminder.
-It also moves the notes of the reviewer and the curator from `notices.pending` to Claude.
+This skill makes `~/.claude/skills/` a git repository. It does not change your current skills.
+Until you do the setup, the plugin does not start reviews. At each session start, Claude tells you to do the setup.
 
-**File:** [`dot-claude/hooks/skill-learning-reminder.sh`](dot-claude/hooks/skill-learning-reminder.sh)
+**File:** [`plugins/self-learning-skills/skills/setup/SKILL.md`](plugins/self-learning-skills/skills/setup/SKILL.md)
 
-### 4.4 `~/.claude/skill-review/stop-hook.sh`
+### 4.4 `skills/curate/SKILL.md`
 
-This hook operates after each Claude reply.
-It counts the work steps since the last review. At 15, it starts `run-review.sh` in the background.
+This skill starts the curator. Only you or a schedule can start it. Claude does not start it automatically.
+
+**File:** [`plugins/self-learning-skills/skills/curate/SKILL.md`](plugins/self-learning-skills/skills/curate/SKILL.md)
+
+### 4.5 `scripts/`
+
+| File | What it does |
+| --- | --- |
+| [`lib.sh`](plugins/self-learning-skills/scripts/lib.sh) | Finds the folders. Finds a manual installation of the same system. |
+| [`rules.md`](plugins/self-learning-skills/scripts/rules.md) | The rules for skills. The rules hook gives this text to Claude. |
+| [`session-rules.sh`](plugins/self-learning-skills/scripts/session-rules.sh) | The rules hook (`SessionStart`). |
+| [`skill-learning-reminder.sh`](plugins/self-learning-skills/scripts/skill-learning-reminder.sh) | The reminder hook (`UserPromptSubmit`). |
+| [`stop-hook.sh`](plugins/self-learning-skills/scripts/stop-hook.sh) | The review trigger (`Stop`). |
+| [`run-review.sh`](plugins/self-learning-skills/scripts/run-review.sh) | Sends the session text to the reviewer. Applies the result. Writes a note. |
+| [`review-prompt.md`](plugins/self-learning-skills/scripts/review-prompt.md) | The reviewer instructions, adapted from Hermes Agent. |
+| [`apply-changes.py`](plugins/self-learning-skills/scripts/apply-changes.py) | Writes only to permitted paths in the skill library. Makes a commit. |
+| [`curate.sh`](plugins/self-learning-skills/scripts/curate.sh) | Starts the curator. With fewer than two skills, it stops and does not call the model. |
+| [`curator-prompt.md`](plugins/self-learning-skills/scripts/curator-prompt.md) | The curator instructions. |
+| [`apply-curation.py`](plugins/self-learning-skills/scripts/apply-curation.py) | Does each merge (section 5.5). |
+| [`setup-library.sh`](plugins/self-learning-skills/scripts/setup-library.sh) | Makes the skill library a git repository. |
+| [`on-skill-redirect.example`](plugins/self-learning-skills/scripts/on-skill-redirect.example) | Optional link to an external memory, for example Hindsight. |
 
 A work step is one Claude response that uses one or more tools. Many tools in one response are one step.
 All tools count, MCP tools also. The hook ignores bookkeeping tools: `mcp__ccd_turn__*` and `ToolSearch`.
-You do not add tool names to the script. A new MCP tool counts automatically.
-
 If Claude changed a skill in that period, the hook sets the count to zero. It does not start a review.
-
-**File:** [`dot-claude/skill-review/stop-hook.sh`](dot-claude/skill-review/stop-hook.sh)
-
-### 4.5 `~/.claude/skill-review/run-review.sh`
-
-This script makes a short text version of the session.
-It sends the instructions, the skill library and the session text to a headless Claude.
-That Claude has no tools. Then the script applies the result and writes a note.
-
-**File:** [`dot-claude/skill-review/run-review.sh`](dot-claude/skill-review/run-review.sh)
-
-### 4.6 `~/.claude/skill-review/review-prompt.md`
-
-These are the reviewer instructions. They are an adapted version of the Hermes Agent review prompt.
-
-**File:** [`dot-claude/skill-review/review-prompt.md`](dot-claude/skill-review/review-prompt.md)
-
-### 4.7 `~/.claude/skill-review/apply-changes.py`
-
-This script reads the JSON block from the reviewer.
-It writes only to permitted paths in the skill library. Then it makes a git commit.
-
-**File:** [`dot-claude/skill-review/apply-changes.py`](dot-claude/skill-review/apply-changes.py)
-
-### 4.8 `~/.claude/skill-review/curate.sh`
-
-This script starts the curator. If the library has fewer than two skills, it stops and does not call the model.
-
-**File:** [`dot-claude/skill-review/curate.sh`](dot-claude/skill-review/curate.sh)
-
-### 4.9 `~/.claude/skill-review/curator-prompt.md`
-
-These are the curator instructions.
-
-**File:** [`dot-claude/skill-review/curator-prompt.md`](dot-claude/skill-review/curator-prompt.md)
-
-### 4.10 `~/.claude/skill-review/apply-curation.py`
-
-This script does each merge. It makes sure that each old name stays available:
-
-1. It writes the merged skill. It adds `Formerly: <old-name>` to the description.
-2. It moves the support files of the old skill into the merged skill.
-3. It moves the old folder to `.archive/`. It does not delete the folder.
-4. It adds a row to `REDIRECTS.md`.
-5. It makes a git commit.
-6. It starts `on-skill-redirect` for each old name, if that file exists.
-
-**File:** [`dot-claude/skill-review/apply-curation.py`](dot-claude/skill-review/apply-curation.py)
-
-### 4.11 `~/.claude/skill-review/on-skill-redirect.example` (optional)
-
-An external memory (for example, Hindsight) can keep the name of an old skill.
-This file sends "use the new skill" to the external memory.
-To use it, copy it to `on-skill-redirect`, write the memory call, and make it executable.
-
-**File:** [`dot-claude/skill-review/on-skill-redirect.example`](dot-claude/skill-review/on-skill-redirect.example)
-
-### 4.12 `~/.claude/skills/README.md`
-
-**File:** [`dot-claude/skills/README.md`](dot-claude/skills/README.md)
-
-### 4.13 `~/.claude/skills/REDIRECTS.md`
-
-Start with this empty table. The merge script adds the rows.
-
-**File:** [`dot-claude/skills/REDIRECTS.md`](dot-claude/skills/REDIRECTS.md)
-
-### 4.14 Scheduled task: `weekly-skill-curator`
-
-The Claude app makes this file when you make the scheduled task (step 6.4).
-Use this text as the task prompt. Use the cron expression `0 10 * * 1` (Monday, 10:00, local time).
-
-**File:** [`dot-claude/scheduled-tasks/weekly-skill-curator/SKILL.md`](dot-claude/scheduled-tasks/weekly-skill-curator/SKILL.md)
 
 ---
 
@@ -261,7 +186,8 @@ Use this text as the task prompt. Use the cron expression `0 10 * * 1` (Monday, 
 
 ```mermaid
 flowchart TD
-  U[You send a message] --> R[Reminder hook adds the rules and new notes]
+  S[Session starts] --> RH[Rules hook gives Claude the rules]
+  U[You send a message] --> R[Reminder hook adds the reminder and new notes]
   R --> C[Claude does the task]
   C -->|You correct a step| S1[Claude changes the skill and makes a commit]
   C --> F[Claude finishes the reply]
@@ -272,56 +198,49 @@ flowchart TD
   J --> A[Apply script writes files and makes a commit]
   A --> N[Note goes into notices.pending]
   N --> R
-  W[Monday 10:00 scheduled task] --> CU[Curator examines all skills]
+  W[You or a schedule start the curator] --> CU[Curator examines all skills]
   CU --> M[Merge script merges skills and keeps old names]
   M --> N
 ```
 
-### 5.2 Sequence for each message
+### 5.2 Sequence at session start
+
+1. A session starts, or Claude Code makes a compaction.
+2. The rules hook gives Claude the rules from `rules.md`.
+3. If the skill library is not a git repository, the hook adds a note. Claude tells you to do the setup.
+
+### 5.3 Sequence for each message
 
 1. You send a message.
-2. The reminder hook adds the rules reminder to the message.
+2. The reminder hook adds the reminder to the message.
 3. If `notices.pending` has notes, the hook adds them too. Then it moves them to `notices.seen`.
 4. Claude tells you about each note in one line.
 5. If your message corrects a step of a known task, Claude changes the skill. Claude makes a commit and tells you in one line.
 
-### 5.3 Sequence after each reply (background review)
+### 5.4 Sequence after each reply (background review)
 
 1. Claude finishes the reply. The `Stop` hook starts.
-2. The hook reads the session transcript. It counts the work steps after the last review position.
-   It does not count bookkeeping tools.
+2. The hook counts the work steps after the last review position.
 3. If Claude changed a skill in that period, the hook moves the review position and stops.
 4. If the count is less than 15, the hook stops.
-5. If the count is 15 or more, the hook moves the review position. It starts `run-review.sh` in the background. The hook stops immediately.
-6. `run-review.sh` makes a short text of the session. The new part is marked for review. The old part is context only.
-7. The reviewer gets the instructions, all skills and the session text. It has no tools.
-8. The reviewer writes a `<skill-changes>` JSON block.
-9. `apply-changes.py` writes the permitted files and makes a commit.
-10. The runner writes a one-line note to `notices.pending`. Section 5.2 shows the note to you.
+5. If the count is 15 or more, the hook starts `run-review.sh` in the background. The hook stops immediately.
+6. The reviewer gets the instructions, all skills and the session text. It has no tools.
+7. The reviewer writes a `<skill-changes>` JSON block.
+8. `apply-changes.py` writes the permitted files and makes a commit.
+9. The runner writes a one-line note to `notices.pending`. Section 5.3 shows the note to you.
 
 **NOTE:** A review takes approximately 40 to 60 seconds. With Opus 5.5, it costs approximately USD 0.25 to 0.40.
 
-### 5.4 Weekly sequence (curator)
-
-1. On Monday at 10:00, the Claude app starts the scheduled task. If the app is closed at that time, the task starts when you open the app.
-2. The task runs `curate.sh`.
-3. If the library has fewer than two skills, the script stops.
-4. The curator gets all skills. It has no tools. It writes a `<curation>` JSON block.
-5. `apply-curation.py` does each merge (section 4.10).
-6. The script writes a note to `notices.pending`. You see the note in your next session.
-
 ### 5.5 How old skill names continue to work
 
-Your memory, Claude memory or an external memory can keep the name of a skill.
-After a merge, that name is not a folder in the library.
-These items keep the old name available:
+The curator merges skills. These items keep each old name available:
 
 | Item | Where | Effect |
 | --- | --- | --- |
 | Alias | Description of the merged skill: `Formerly: <old-name>` | A request with the old words finds the merged skill. |
 | Redirect row | `~/.claude/skills/REDIRECTS.md` | Claude looks here when it cannot find a skill name. |
 | Archive | `~/.claude/skills/.archive/<old-name>/` | The old text stays available. |
-| External note | `on-skill-redirect` (optional) | The external memory gets "use the new skill". |
+| External note | `~/.claude/skill-review/on-skill-redirect` (optional) | The external memory gets "use the new skill". |
 
 ---
 
@@ -330,56 +249,46 @@ These items keep the old name available:
 ### 6.1 Make sure that the prerequisites are available
 
 1. Make sure that Claude Code is installed. Type `claude --version`.
-2. Make sure that `jq` is installed. Type `jq --version`.
-3. Make sure that `git` is installed. Type `git --version`.
-4. Make sure that `/usr/bin/python3` exists. Type `/usr/bin/python3 --version`.
+2. Make sure that `jq` and `git` are installed. Type `jq --version` and `git --version`.
+3. Make sure that `/usr/bin/python3` exists. Type `/usr/bin/python3 --version`.
 
-### 6.2 Get the files
-
-1. Type these commands:
-
-```bash
-git clone https://github.com/oiegorov-embrace/claude-self-learning-skills.git
-cd claude-self-learning-skills
-```
-
-### 6.3 Run the installer
+### 6.2 Install the plugin (recommended)
 
 1. Type this command:
 
 ```bash
-./install.sh
+claude plugin install self-learning-skills --marketplace oiegorov-embrace/claude-self-learning-skills
 ```
 
-2. If the installer asks for a git identity, type the command again with your name and your e-mail address:
+2. Start Claude Code.
+3. Type `/self-learning-skills:setup`. If Claude asks for a name and an e-mail address for git, give them.
+4. Start a new session. The reviews start in that session.
+
+**NOTE:** The plugin does not change `settings.json` or `CLAUDE.md`. Claude Code adds only one entry to `extraKnownMarketplaces` and one entry to `enabledPlugins`. The setup changes only `~/.claude/skills/`.
+
+### 6.3 Install without plugins
+
+Use this procedure only if your organization does not let you install plugins.
+
+1. Get the files and run the installer:
 
 ```bash
-./install.sh --git-name "<your name>" --git-email "<your e-mail>"
+git clone https://github.com/oiegorov-embrace/claude-self-learning-skills.git
+cd claude-self-learning-skills && ./install.sh
 ```
 
-The installer does these steps:
+2. If the installer asks for a git identity, type `./install.sh --git-name "<your name>" --git-email "<your e-mail>"`.
 
-1. It makes backups of `settings.json`, `CLAUDE.md` and each changed script that it replaces. The backups go to `~/.claude/backups/`.
-2. It copies the hook and the scripts to `~/.claude/hooks/` and `~/.claude/skill-review/`.
-3. It makes `~/.claude/skills/` a git repository. It does not change your current skills.
-4. It adds the rules to `~/.claude/CLAUDE.md` between `<!-- self-learning-skills:start -->` and `<!-- self-learning-skills:end -->`.
-5. It adds the two hooks to `~/.claude/settings.json`. It keeps your other hooks.
+The manual installer copies the scripts to `~/.claude/skill-review/`. It adds the rules to `~/.claude/CLAUDE.md` between marker lines. It adds two hooks to `~/.claude/settings.json`.
 
-**NOTE:** The installer does not replace your settings. It merges into them:
+It merges into your files. It does not replace them. It writes through symlinks. You can run it again. `--uninstall` removes only its own entries.
 
-- It changes only the `hooks` key of `settings.json`. All other settings stay the same.
-- It adds its hooks after your hooks. It does not change or remove your hooks.
-- It adds its rules block to the end of `CLAUDE.md`. Your text stays the same.
-- It writes through a symlink. A file that links to a dotfiles folder stays a link.
-- You can run it again, for example after an update. It does not make duplicates.
-- `--uninstall` removes only its own hooks and its own rules block.
+**CAUTION:** Do not use the plugin and the manual installation together. If you do, the plugin stops its hooks and tells you. Remove one of them (section 8.2).
 
-To see the proof, type `tests/merge-safety.sh`. The test uses a temporary home folder.
+### 6.4 Schedule the curator (optional)
 
-### 6.4 Make the weekly scheduled task
-
-1. In a Claude Code session in the desktop app, ask Claude to make a scheduled task.
-2. Give Claude the name `weekly-skill-curator`, the prompt in `dot-claude/scheduled-tasks/weekly-skill-curator/SKILL.md` and the schedule `0 10 * * 1`.
+1. In the Claude desktop app, ask Claude to make a scheduled task.
+2. Give Claude the name `weekly-skill-curator`, the prompt `/self-learning-skills:curate` and the schedule `0 10 * * 1`.
 3. Make sure that the task shows in the **Scheduled** part of the sidebar.
 
 **NOTE:** Scheduled tasks operate only when the Claude app is open. A missed task starts when you open the app.
@@ -388,17 +297,19 @@ To see the proof, type `tests/merge-safety.sh`. The test uses a temporary home f
 
 ## 7. Test procedure
 
-### 7.1 Test the reminder hook
+### 7.1 Test the plugin scripts
 
-1. Type this command:
+1. In the repository folder, type `tests/plugin-mode.sh`.
+2. Make sure that the last line is `14 passed, 0 failed`.
 
-```bash
-echo '{}' | ~/.claude/hooks/skill-learning-reminder.sh | jq .
-```
+The test uses a temporary home folder and a test `claude` program. It does not call a model. It does not change your files.
 
-2. Make sure that the output has `additionalContext` with the "Skill check" text.
+### 7.2 Test the manual installer
 
-### 7.2 Test the background review
+1. In the repository folder, type `tests/merge-safety.sh`.
+2. Make sure that the last line is `11 passed, 0 failed`.
+
+### 7.3 Test in a real session
 
 1. Do a task in a session with 15 or more work steps. Correct Claude at least one time.
 2. Wait approximately one minute after the reply.
@@ -406,34 +317,16 @@ echo '{}' | ~/.claude/hooks/skill-learning-reminder.sh | jq .
 4. Make sure that Claude tells you about a "Background skill review" change.
 5. Type `git -C ~/.claude/skills log --oneline`. Make sure that a commit with "(background review)" exists.
 
-### 7.3 Test the curator on a test library
-
-**CAUTION:** Do not test the curator on your real library first. Use a test copy.
-
-1. Make a test folder with a git repository. Put two skills that are almost the same in it. Put one different skill in it.
-2. Type this command. Change `<test-folder>` to your test folder.
-
-```bash
-SKILLS_DIR=<test-folder> NOTICES=<test-folder>/notices ~/.claude/skill-review/curate.sh
-```
-
-3. Make sure that the two similar skills are now one skill.
-4. Make sure that the description of the merged skill has `Formerly: <old-name>`.
-5. Make sure that the old folder is in `.archive/`.
-6. Make sure that `REDIRECTS.md` has a new row.
-7. Make sure that the different skill did not change.
-
 ---
 
 ## 8. Settings and maintenance
 
 | Setting | Where | Default | Effect |
 | --- | --- | --- | --- |
-| `SKILL_REVIEW_THRESHOLD` | Environment variable | `15` | Number of work steps before a review |
-| `SKILL_REVIEW_IGNORE_TOOLS` | Environment variable | `^(mcp__ccd_turn__.*\|ToolSearch)$` | Regular expression. The hook does not count the tools that agree with it. |
-| `SKILL_REVIEW_MODEL` | Environment variable | `claude-opus-5-5` | Model for the reviewer. `claude-sonnet-5-5` costs less. |
-| `CURATOR_MODEL` | Environment variable | `claude-opus-5-5` | Model for the curator |
-| Schedule | Claude app, **Scheduled** | Monday 10:00 | Time of the curator run |
+| `SKILL_REVIEW_THRESHOLD` | `env` in `settings.json` | `15` | Number of work steps before a review |
+| `SKILL_REVIEW_IGNORE_TOOLS` | `env` in `settings.json` | `^(mcp__ccd_turn__.*\|ToolSearch)$` | Regular expression. The hook does not count the tools that agree with it. |
+| `SKILL_REVIEW_MODEL` | `env` in `settings.json` | `claude-opus-5-5` | Model for the reviewer. `claude-sonnet-5-5` costs less. |
+| `CURATOR_MODEL` | `env` in `settings.json` | `claude-opus-5-5` | Model for the curator |
 
 ### 8.1 Undo a skill change
 
@@ -449,20 +342,35 @@ git -C ~/.claude/skills log --oneline
 git -C ~/.claude/skills revert <commit>
 ```
 
-### 8.2 Stop the system
+### 8.2 Remove the system
 
-1. Type `./install.sh --uninstall` in the repository folder. This removes the hooks and the rules block. It keeps your skills and logs.
-2. Pause the `weekly-skill-curator` task in the Claude app to stop the curator.
+1. Remove the plugin:
+
+```bash
+claude plugin uninstall self-learning-skills@self-learning-skills
+```
+
+2. For a manual installation, type `./install.sh --uninstall` in the repository folder.
+3. Delete the `weekly-skill-curator` scheduled task, if you made one.
+
+**NOTE:** Your skill library `~/.claude/skills/` stays. Delete it yourself if you do not want it.
+
+### 8.3 Update the plugin
+
+1. Type `claude plugin update self-learning-skills@self-learning-skills`.
 
 ---
 
 ## 9. Troubleshooting
 
+In this table, `<data>` is `~/.claude/plugins/data/self-learning-skills-self-learning-skills/` for the plugin and `~/.claude/skill-review/` for a manual installation.
+
 | Symptom | Possible cause | Action |
 | --- | --- | --- |
-| Note says "Background skill review failed" | The headless `claude` did not start, or it gave no JSON block | Read the `.err` and `.json` files in `~/.claude/skill-review/logs/`. |
-| No review after a long task | The count is less than 15, or Claude changed a skill in that period | Examine `~/.claude/skill-review/state/<session-id>.line`. |
-| A review never starts again | A lock folder stayed after a crash | Remove `~/.claude/skill-review/state/<session-id>.lock`. |
-| The curator never starts | A lock folder stayed after a crash | Remove `~/.claude/skill-review/curator.lock`. |
-| The reviewer writes nothing to `~/.claude/` when it has tools | Claude Code protects `~/.claude/` from headless writes | Keep the reviewer without tools. The apply script writes the files. |
-| `head: illegal line count -- 0` | Old version of `run-review.sh` on macOS | Use the version in section 4.5. |
+| Claude says "SETUP NEEDED" | The skill library is not a git repository | Type `/self-learning-skills:setup`. |
+| Claude says the plugin is inactive | The manual installation is also registered | Remove one of them (section 8.2). |
+| Note says "Background skill review failed" | The headless `claude` did not start, or it gave no JSON block | Read the `.err` and `.json` files in `<data>/logs/`. |
+| No review after a long task | The count is less than 15, or Claude changed a skill in that period | Examine `<data>/state/<session-id>.line`. |
+| A review never starts again | A lock folder stayed after a crash | Remove `<data>/state/<session-id>.lock`. |
+| The curator never starts | A lock folder stayed after a crash | Remove `<data>/curator.lock`. |
+| `plugin install` fails with a git error | The computer has no GitHub SSH key | Set `CLAUDE_CODE_PLUGIN_PREFER_HTTPS=1`, then try again. |

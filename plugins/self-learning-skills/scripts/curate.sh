@@ -1,28 +1,30 @@
 #!/bin/bash
-# Weekly skill curator (run by the Claude app scheduled task "weekly-skill-curator").
+# Weekly skill curator. Run by the plugin skill /self-learning-skills:curate (for example from a
+# scheduled task), or directly for a manual install: ~/.claude/skill-review/curate.sh.
 # Shows a headless, tool-less Claude the whole skill library, asks which skills overlap enough
 # to merge, and applies the merges with apply-curation.py: survivor gets "Formerly: <old>"
 # aliases, old folders go to .archive/, REDIRECTS.md gets a row, all committed, and
 # on-skill-redirect (if executable) is called per old name, e.g. to tell Hindsight.
 # Env overrides (for testing): SKILLS_DIR, NOTICES, CURATOR_MODEL, REDIRECT_HOOK.
 
-BASE="$HOME/.claude/skill-review"
-SKILLS="${SKILLS_DIR:-$HOME/.claude/skills}"
-NOTICES="${NOTICES:-$BASE/notices.pending}"
+. "$(dirname "$0")/lib.sh"
+[ -n "$STATE" ] || { echo "CLAUDE_PLUGIN_DATA is not set; run this through /self-learning-skills:curate" >&2; exit 1; }
+library_ready || { echo "The skill library $SKILLS is not a git repo yet; run /self-learning-skills:setup first" >&2; exit 1; }
+NOTICES="${NOTICES:-$STATE/notices.pending}"
 MODEL="${CURATOR_MODEL:-claude-opus-5-5}"
 CLAUDE_BIN="$(command -v claude || echo "$HOME/.local/bin/claude")"
-log="$BASE/logs/$(date +%Y%m%d-%H%M%S)-curator"
-mkdir -p "$BASE/logs"
+log="$STATE/logs/$(date +%Y%m%d-%H%M%S)-curator"
+mkdir -p "$STATE/logs"
 
-mkdir "$BASE/curator.lock" 2>/dev/null || exit 0
-trap 'rmdir "$BASE/curator.lock" 2>/dev/null' EXIT
+mkdir "$STATE/curator.lock" 2>/dev/null || exit 0
+trap 'rmdir "$STATE/curator.lock" 2>/dev/null' EXIT
 
 # Fewer than two skills: nothing to merge, skip the model call.
 count=$(cd "$SKILLS" && ls -d */SKILL.md 2>/dev/null | grep -v -e '^synced/' -e '^\.archive/' | wc -l | tr -d ' ')
 [ "$count" -ge 2 ] || { echo "$(date) skipped: $count skill(s)" >"$log.skipped"; exit 0; }
 
 {
-  cat "$BASE/curator-prompt.md"
+  cat "$CODE/curator-prompt.md"
   echo
   echo "Today is $(date +%Y-%m-%d)."
   echo
@@ -42,7 +44,7 @@ SKILL_REVIEWER=1 "$CLAUDE_BIN" -p \
   --output-format json \
   <"$log.prompt.txt" >"$log.json" 2>"$log.err"
 
-if summary=$(/usr/bin/python3 -I "$BASE/apply-curation.py" "$log.json" "$SKILLS" "${REDIRECT_HOOK:-$BASE/on-skill-redirect}" 2>>"$log.err"); then
+if summary=$(/usr/bin/python3 -I "$CODE/apply-curation.py" "$log.json" "$SKILLS" "${REDIRECT_HOOK:-$HOME/.claude/skill-review/on-skill-redirect}" 2>>"$log.err"); then
   [ "$summary" != "Skill curator: no merges needed." ] && echo "$(date '+%Y-%m-%d %H:%M')	$summary" >>"$NOTICES"
 else
   echo "$(date '+%Y-%m-%d %H:%M')	Weekly skill curator failed; see $log.err" >>"$NOTICES"

@@ -1,5 +1,6 @@
 #!/bin/bash
-# Installer for self-learning skills. Installs into ~/.claude (all projects of this user).
+# Manual installer for self-learning skills, for setups that can't use Claude Code plugins.
+# Prefer the plugin (README.md / AGENTS.md). Installs into ~/.claude (all projects of this user).
 # Safe to run again: it replaces its own hook entries and its own CLAUDE.md block instead of
 # adding duplicates, never overwrites your skills, and backs up settings.json, CLAUDE.md and
 # any changed hook scripts it replaces.
@@ -26,7 +27,7 @@ done
 for c in claude jq git; do command -v "$c" >/dev/null || { echo "$c is required" >&2; exit 1; }; done
 [ -x /usr/bin/python3 ] || { echo "/usr/bin/python3 is required (the scripts call it by that path)" >&2; exit 1; }
 
-REPO="$(cd "$(dirname "$0")" && pwd)/dot-claude"
+SRC="$(cd "$(dirname "$0")" && pwd)/plugins/self-learning-skills"
 C="$HOME/.claude"
 SETTINGS="$C/settings.json"
 MD="$C/CLAUDE.md"
@@ -73,16 +74,17 @@ put() {  # put <source> <target-dir>
   if [ -f "$t" ] && ! cmp -s "$1" "$t"; then mkdir -p "$B/$(basename "$2")"; cp "$t" "$B/$(basename "$2")/"; fi
   cp "$1" "$2/"
 }
-put "$REPO/hooks/skill-learning-reminder.sh" "$C/hooks"
-for f in stop-hook.sh run-review.sh curate.sh apply-changes.py apply-curation.py review-prompt.md curator-prompt.md on-skill-redirect.example; do
-  put "$REPO/skill-review/$f" "$C/skill-review"
+put "$SRC/scripts/skill-learning-reminder.sh" "$C/hooks"
+put "$SRC/scripts/lib.sh" "$C/hooks"
+for f in lib.sh stop-hook.sh run-review.sh curate.sh apply-changes.py apply-curation.py review-prompt.md curator-prompt.md on-skill-redirect.example; do
+  put "$SRC/scripts/$f" "$C/skill-review"
 done
 [ -d "$B" ] && echo "Backed up replaced scripts to $B" 
 chmod +x "$C/hooks/skill-learning-reminder.sh" "$C/skill-review/"*.sh
 
 # --- skills library: add files only if missing, make it a git repo ---
-[ -f "$C/skills/README.md" ] || cp "$REPO/skills/README.md" "$C/skills/"
-[ -f "$C/skills/REDIRECTS.md" ] || cp "$REPO/skills/REDIRECTS.md" "$C/skills/"
+[ -f "$C/skills/README.md" ] || cp "$SRC/library/README.md" "$C/skills/"
+[ -f "$C/skills/REDIRECTS.md" ] || cp "$SRC/library/REDIRECTS.md" "$C/skills/"
 if [ ! -d "$C/skills/.git" ]; then
   git -C "$C/skills" init -q -b main
   [ -f "$C/skills/.gitignore" ] || printf 'synced/\n.DS_Store\n' > "$C/skills/.gitignore"
@@ -100,12 +102,13 @@ strip_md
 if grep -q '^## Self-learning skills' "$MD"; then
   echo "NOTE: $MD already has a '## Self-learning skills' section without install markers; left it unchanged." >&2
 else
-  { [ -s "$MD" ] && echo; echo "$START"; sed -n '/^## Self-learning skills/,$p' "$REPO/claude-md-block.md"; echo "$END"; } >> "$MD"
+  { [ -s "$MD" ] && echo; echo "$START"; sed -n '/^## Self-learning skills/,$p' "$SRC/scripts/rules.md"; echo "$END"; } >> "$MD"
 fi
 
 # --- hooks ---
-add=$(jq '.hooks' "$REPO/settings.hooks.json")
+add='{"UserPromptSubmit":[{"hooks":[{"type":"command","command":"~/.claude/hooks/skill-learning-reminder.sh"}]}],"Stop":[{"hooks":[{"type":"command","command":"~/.claude/skill-review/stop-hook.sh"}]}]}'
 apply --argjson add "$add" "$strip"' | .hooks = (reduce ($add | to_entries[]) as $e ((.hooks // {}); .[$e.key] = ((.[$e.key] // []) + $e.value)))'
 
 echo "Installed self-learning skills in $C."
+grep -qs '"self-learning-skills@' "$SETTINGS" && echo "NOTE: the self-learning-skills plugin is also enabled. It stays inactive while this manual install is registered; uninstall one of them."
 echo "Next: set up the weekly curator (AGENTS.md step 6), then start a new Claude Code session."

@@ -4,23 +4,27 @@ You are an AI agent. The user pointed you at this repository so that you set it 
 Follow these steps in order. README.md has the background and the design; you don't need it to install.
 If you fetch this file, fetch the raw file (https://raw.githubusercontent.com/oiegorov-embrace/claude-self-learning-skills/main/AGENTS.md), not the GitHub page, so you get every command verbatim.
 
-## What this installs (all in `~/.claude/`, for every project of this user)
+## What this installs
+
+A Claude Code plugin, `self-learning-skills@self-learning-skills`, for all projects of this user.
 
 | Part | Effect |
 | --- | --- |
-| Rules block in `~/.claude/CLAUDE.md` | Tells Claude to turn the user's corrections into skills in `~/.claude/skills/` and commit them. |
+| `SessionStart` hook | Gives Claude the rules for turning the user's corrections into skills in `~/.claude/skills/`. |
 | `UserPromptSubmit` hook | Adds a one-line "skill check" note to each message, and passes on notes from background reviews. |
 | `Stop` hook + background reviewer | After ~15 work steps, runs a tool-less `claude -p` reviewer in the background that may add or edit skills. **Costs about USD 0.25–0.40 per review with Opus.** |
-| Weekly curator (optional schedule) | Merges overlapping skills; old names stay reachable through aliases and `REDIRECTS.md`. |
-| `~/.claude/skills/` git repo | Every skill change is a commit, so it can be reviewed and reverted. |
+| `/self-learning-skills:setup` | One-time: makes `~/.claude/skills/` a git repository (never changes existing skills). |
+| `/self-learning-skills:curate` | On demand or scheduled: merges overlapping skills; old names stay reachable. |
+
+The plugin does not edit `settings.json` or `CLAUDE.md`. Claude Code adds one `extraKnownMarketplaces` entry and one `enabledPlugins` entry. State lives in the plugin data folder, which Claude Code deletes on uninstall; the skill library stays.
 
 ## Step 1: get consent and two facts
 
-Tell the user, in two or three lines, what the table above says, including the background cost and that `~/.claude/CLAUDE.md` gets a marked block. Ask:
+Tell the user, in two or three lines, what the table above says, including the background cost. Ask:
 
 1. "OK to install?" Stop if not.
-2. "Which name and email should the skills git repo use?" Skip if `git config --global user.email` already prints one and the user is fine with it.
-3. "Run the weekly curator? If yes, which day and time?" Default: Monday 10:00 local time.
+2. "Which name and email should the skill library's git commits use?" Skip if `git config --global user.email` already prints one and the user is fine with it.
+3. "Run the curator weekly? If yes, which day and time?" Default: Monday 10:00 local time.
 
 ## Step 2: check prerequisites
 
@@ -28,68 +32,76 @@ Tell the user, in two or three lines, what the table above says, including the b
 claude --version && jq --version && git --version && /usr/bin/python3 --version
 ```
 
-Expected: four version lines and no error.
+Expected: four version lines and no error. Platform: macOS or Linux. If something is missing, stop and tell the user what to install.
 
-Platform: macOS or Linux. If something is missing, stop and tell the user what to install.
-
-## Step 3: get the files
+## Step 3: detect an existing install (avoid running twice)
 
 ```bash
-git clone https://github.com/oiegorov-embrace/claude-self-learning-skills.git
-cd claude-self-learning-skills
+claude plugin list 2>/dev/null | grep -A4 'self-learning-skills@'
+grep -E 'skill-review/stop-hook\.sh|hooks/skill-learning-reminder\.sh' ~/.claude/settings.json
 ```
 
-Any folder works; the installer copies what it needs into `~/.claude/`. Keep the clone for `./install.sh --uninstall` and for updates (`git pull && ./install.sh`).
+- No output from either command → continue.
+- The plugin is already enabled → skip to step 5.
+- `grep` prints a line → a manual install (`install.sh`) exists. Tell the user; the plugin would stay inactive next to it. If the user wants the plugin, clone this repo and run `./install.sh --uninstall` first (it keeps skills and logs). Otherwise stop here.
 
 ## Step 4: install
 
 ```bash
-./install.sh                                              # git identity already set globally
-./install.sh --git-name "<name>" --git-email "<email>"    # otherwise
+claude plugin install self-learning-skills --marketplace oiegorov-embrace/claude-self-learning-skills
+# expect: ✔ Successfully installed plugin: self-learning-skills@self-learning-skills (scope: user)
 ```
 
-Expected last line: `Installed self-learning skills in <home>/.claude.` If no git identity is available, it prints `No git identity ... Nothing was changed.` and exits; ask the user for name and email and rerun.
+If it fails with a git/SSH error, retry with `CLAUDE_CODE_PLUGIN_PREFER_HTTPS=1` set.
 
-The script is idempotent. It backs up `settings.json`, `CLAUDE.md` and any existing hook scripts it replaces to `~/.claude/backups/`, keeps the user's other hooks, never overwrites existing skills, and puts its rules between `<!-- self-learning-skills:start -->` and `<!-- self-learning-skills:end -->` in `CLAUDE.md`.
-If it prints `NOTE: ... already has a '## Self-learning skills' section`, an older manual install exists. The script then adds no marked block (the existing section already has the rules). Tell the user and leave that section as it is.
-It changes only the `hooks` key of `settings.json`, appends its hooks after the user's own, writes through symlinks (dotfiles), and `--uninstall` removes only its own entries. `tests/merge-safety.sh` proves this on a throwaway home; run it first if the user wants proof.
-Don't edit `settings.json` or `CLAUDE.md` by hand.
+Then set up the skill library. A plugin skill can't run from a shell, so run the setup script from the installed plugin:
+
+```bash
+ROOT=$(claude plugin list --json | jq -r '.[] | select(.id=="self-learning-skills@self-learning-skills") | .installPath')
+bash "$ROOT/scripts/setup-library.sh"                                            # git identity set globally
+bash "$ROOT/scripts/setup-library.sh" --git-name "<name>" --git-email "<email>"  # otherwise
+# expect: Skill library ready: <home>/.claude/skills (<n> commits).
+```
+
+If it prints `No git identity ... Nothing was changed.`, ask the user for a name and email and run the second form. If `ROOT` is empty, tell the user to type `/self-learning-skills:setup` in their next Claude Code session instead.
+
+**Fallback, only if plugins are blocked** (for example by organization policy): `git clone https://github.com/oiegorov-embrace/claude-self-learning-skills.git && cd claude-self-learning-skills && ./install.sh` (add `--git-name`/`--git-email` if asked). It merges into `settings.json` and `CLAUDE.md` (never replaces), writes through symlinks, is safe to rerun, and `--uninstall` removes only its own entries.
 
 ## Step 5: verify
 
 ```bash
-echo '{}' | ~/.claude/hooks/skill-learning-reminder.sh | jq -r .hookSpecificOutput.additionalContext   # expect text that starts with: Skill check (see 'Self-learning skills'
-jq -r '.hooks | keys[]' ~/.claude/settings.json            # expect: Stop and UserPromptSubmit among them
-git -C ~/.claude/skills log --oneline | head -3            # expect: at least one commit
-grep -c 'self-learning-skills:start' ~/.claude/CLAUDE.md   # expect: 1; expect 0 only if step 4 printed the NOTE
+claude plugin list | grep -A4 'self-learning-skills@'   # expect: Status: ✔ enabled
+git -C ~/.claude/skills log --oneline | head -3          # expect: at least one commit
 ```
 
-## Step 6: schedule the weekly curator (only if the user said yes in step 1)
+## Step 6: schedule the curator (only if the user said yes in step 1)
 
 Use the day and time from step 1. Use the first option that you can do.
 
-1. **You have a scheduled-task tool (Claude desktop app):** create a task named `weekly-skill-curator`, with the prompt from `dot-claude/scheduled-tasks/weekly-skill-curator/SKILL.md` (the text below its front matter) and the cron expression for the chosen time (default `0 10 * * 1`). It runs while the app is open, and a missed run starts when the app opens.
-2. **Otherwise:** add a crontab line with the chosen time (this keeps existing entries and adds no duplicate):
+1. **You have a scheduled-task tool (Claude desktop app):** create a task named `weekly-skill-curator` with the prompt `/self-learning-skills:curate` and the cron expression for the chosen time (default `0 10 * * 1`). It runs while the app is open; a missed run starts when the app opens.
+2. **Otherwise:** add a crontab line with the chosen time (keeps existing entries, adds no duplicate):
    ```bash
-   LINE='0 10 * * 1 /bin/bash "$HOME/.claude/skill-review/curate.sh"'
-   crontab -l 2>/dev/null | grep -qF 'skill-review/curate.sh' || ( crontab -l 2>/dev/null; echo "$LINE" ) | crontab -
-   crontab -l | grep curate.sh   # expect: the line above
+   LINE="0 10 * * 1 $(command -v claude) -p '/self-learning-skills:curate' --allowedTools Bash"
+   crontab -l 2>/dev/null | grep -qF 'self-learning-skills:curate' || ( crontab -l 2>/dev/null; echo "$LINE" ) | crontab -
+   crontab -l | grep curate   # expect: the line above, with the full path to claude (cron has a short PATH)
    ```
-3. **Neither is possible:** tell the user to run `~/.claude/skill-review/curate.sh` by hand now and then.
+   For a manual install, use `/bin/bash "$HOME/.claude/skill-review/curate.sh"` as the command instead.
+3. **Neither is possible:** tell the user to type `/self-learning-skills:curate` now and then.
 
 ## Step 7: report to the user
 
 Tell the user, briefly:
 
-1. What you installed, and that it applies to all their Claude Code projects from the next session.
-2. That background reviews cost about USD 0.25–0.40 each, and that `SKILL_REVIEW_MODEL=claude-sonnet-5-5` makes them cheaper.
+1. What you installed, and that reviews start in their next Claude Code session.
+2. That background reviews cost about USD 0.25–0.40 each, and that `SKILL_REVIEW_MODEL=claude-sonnet-5-5` in the `env` of `settings.json` makes them cheaper.
 3. Whether and when the curator runs.
 4. How to undo a skill change: `git -C ~/.claude/skills revert <commit>`.
-5. How to remove the system: `./install.sh --uninstall` (keeps skills and logs), then remove the curator schedule: delete the `weekly-skill-curator` scheduled task in the Claude app, or remove the cron line: `crontab -l | grep -vF 'skill-review/curate.sh' | crontab -`.
+5. How to remove it: `claude plugin uninstall self-learning-skills@self-learning-skills` (skills stay), then remove the schedule: delete the scheduled task in the Claude app, or `crontab -l | grep -vF 'self-learning-skills:curate' | crontab -`.
 
 ## Rules for you
 
 - Never write into `~/.claude/skills/synced/`; the claude.ai sync owns it.
 - Never delete skills, logs or backups.
+- Don't edit `settings.json` or `CLAUDE.md` by hand.
 - Ask before anything not listed here.
 - If a step's output differs from the expected output, stop and show the user the output.

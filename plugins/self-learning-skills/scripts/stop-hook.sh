@@ -8,17 +8,20 @@
 
 THRESHOLD="${SKILL_REVIEW_THRESHOLD:-15}"
 IGNORE="${SKILL_REVIEW_IGNORE_TOOLS:-^(mcp__ccd_turn__.*|ToolSearch)$}"
-BASE="$HOME/.claude/skill-review"
+. "$(dirname "$0")/lib.sh"
 
 [ "$SKILL_REVIEWER" = 1 ] && exit 0   # never review the reviewer
+[ -n "$STATE" ] || exit 0
+manual_also_installed && exit 0
+library_ready || exit 0
 
 input=$(cat)
 sid=$(jq -r '.session_id // empty' <<<"$input")
 tp=$(jq -r '.transcript_path // empty' <<<"$input")
 [ -n "$sid" ] && [ -f "$tp" ] || exit 0
 
-mkdir -p "$BASE/state" "$BASE/logs"
-st="$BASE/state/$sid"
+mkdir -p "$STATE/state" "$STATE/logs"
+st="$STATE/state/$sid"
 last=$(cat "$st.line" 2>/dev/null || echo 0)
 total=$(wc -l <"$tp" | tr -d ' ')
 
@@ -46,5 +49,5 @@ fi
 
 mkdir "$st.lock" 2>/dev/null || exit 0   # a review for this session is already running
 echo "$total" >"$st.line"
-nohup "$BASE/run-review.sh" "$sid" "$tp" "$last" </dev/null >/dev/null 2>&1 &
+nohup "$CODE/run-review.sh" "$sid" "$tp" "$last" </dev/null >/dev/null 2>&1 &
 exit 0

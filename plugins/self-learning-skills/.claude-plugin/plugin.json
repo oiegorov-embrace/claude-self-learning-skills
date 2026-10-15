@@ -1,0 +1,14 @@
+{
+  "name": "self-learning-skills",
+  "description": "Turns your corrections into personal Claude Code skills: rules at session start, a skill check on each message, a background reviewer (~USD 0.25-0.40 per review with Opus) and an on-demand curator that merges overlapping skills while keeping old names reachable.",
+  "author": {
+    "name": "oiegorov-embrace"
+  },
+  "repository": "https://github.com/oiegorov-embrace/claude-self-learning-skills",
+  "keywords": [
+    "skills",
+    "self-learning",
+    "memory",
+    "hooks"
+  ]
+}
