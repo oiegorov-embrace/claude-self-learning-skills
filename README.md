@@ -1,10 +1,38 @@
-# Self-Learning Skills for Claude Code: Setup Instruction
+# Self-Learning Skills for Claude Code
+
+Claude Code forgets your corrections when a session ends.
+This system writes each correction into a skill. All future sessions use the skill.
+A background reviewer finds the corrections that Claude did not record. A weekly curator merges similar skills.
+
+**Install with an AI agent.** Give your agent this text:
+
+> Set up https://github.com/oiegorov-embrace/claude-self-learning-skills for me. Follow its AGENTS.md.
+
+**Install yourself.** Type these commands in a terminal:
+
+```bash
+git clone https://github.com/oiegorov-embrace/claude-self-learning-skills.git
+cd claude-self-learning-skills && ./install.sh
+```
+
+| Before you install | Detail |
+| --- | --- |
+| Scope | All your Claude Code projects. The system changes files in `~/.claude/` only. |
+| Cost | Each background review costs approximately USD 0.25 to 0.40 with Opus. |
+| Your files | The installer makes backups. It keeps your other hooks and your skills. You can run it again. |
+| Removal | `./install.sh --uninstall` |
+
+The full instruction follows.
+
+---
+
+# Setup Instruction
 
 > **Language:** This document uses ASD-STE100 Simplified Technical English.
 > The files in the `dot-claude/` folder are in normal English. Claude reads those files, not people.
 
-**Applicability:** Claude Code CLI and the Code tab of the Claude desktop app, on macOS.
-**Status:** The system was tested on 2026-10-15 with Claude Code 2.1.300.
+**Applicability:** Claude Code CLI and the Code tab of the Claude desktop app, on macOS. Linux is not tested.
+**Status:** The system was tested on 2026-10-15 with Claude Code 2.1.300. The installer was tested on a test home folder.
 
 ---
 
@@ -66,8 +94,10 @@ Section 4 gives a link to each file.
 ```text
 claude-self-learning-skills/
 ├── README.md                          This instruction
+├── AGENTS.md                          Installation procedure for AI agents
+├── install.sh                         Installer (section 6)
 └── dot-claude/                        Copy of the files for ~/.claude/
-    ├── CLAUDE.md
+    ├── claude-md-block.md             Rules block for ~/.claude/CLAUDE.md
     ├── settings.hooks.json            The hooks part of settings.json
     ├── hooks/
     ├── skill-review/
@@ -118,9 +148,10 @@ Each file is in the `dot-claude/` folder of this repository. Its path agrees wit
 ### 4.1 `~/.claude/CLAUDE.md`
 
 Claude reads this file at the start of each session in each project.
-It has the rules for skills. Add this text to the file. If the file does not exist, make it.
+It has the rules for skills. The installer adds this text to the file between two marker lines.
+The file in this repository does not have the name `CLAUDE.md`. Thus, an agent that works in this repository does not read it as instructions.
 
-**File:** [`dot-claude/CLAUDE.md`](dot-claude/CLAUDE.md)
+**File:** [`dot-claude/claude-md-block.md`](dot-claude/claude-md-block.md)
 
 ### 4.2 `~/.claude/settings.json` (hooks part)
 
@@ -141,9 +172,11 @@ It also moves the notes of the reviewer and the curator from `notices.pending` t
 
 This hook operates after each Claude reply.
 It counts the work steps since the last review. At 15, it starts `run-review.sh` in the background.
+
 A work step is one Claude response that uses one or more tools. Many tools in one response are one step.
 All tools count, MCP tools also. The hook ignores bookkeeping tools: `mcp__ccd_turn__*` and `ToolSearch`.
 You do not add tool names to the script. A new MCP tool counts automatically.
+
 If Claude changed a skill in that period, the hook sets the count to zero. It does not start a review.
 
 **File:** [`dot-claude/skill-review/stop-hook.sh`](dot-claude/skill-review/stop-hook.sh)
@@ -214,7 +247,7 @@ Start with this empty table. The merge script adds the rows.
 
 ### 4.14 Scheduled task: `weekly-skill-curator`
 
-The Claude app makes this file when you make the scheduled task (step 6.6).
+The Claude app makes this file when you make the scheduled task (step 6.4).
 Use this text as the task prompt. Use the cron expression `0 10 * * 1` (Monday, 10:00, local time).
 
 **File:** [`dot-claude/scheduled-tasks/weekly-skill-curator/SKILL.md`](dot-claude/scheduled-tasks/weekly-skill-curator/SKILL.md)
@@ -293,14 +326,12 @@ These items keep the old name available:
 
 ## 6. Installation procedure
 
-**WARNING:** Make a backup copy of `~/.claude/settings.json` before you change it. An incorrect file can stop all hooks.
-
 ### 6.1 Make sure that the prerequisites are available
 
 1. Make sure that Claude Code is installed. Type `claude --version`.
 2. Make sure that `jq` is installed. Type `jq --version`.
 3. Make sure that `git` is installed. Type `git --version`.
-4. Make sure that `/usr/bin/python3` exists. On Linux, change this path in `run-review.sh` and `curate.sh`.
+4. Make sure that `/usr/bin/python3` exists. Type `/usr/bin/python3 --version`.
 
 ### 6.2 Get the files
 
@@ -308,70 +339,34 @@ These items keep the old name available:
 
 ```bash
 git clone https://github.com/oiegorov-embrace/claude-self-learning-skills.git
-cd claude-self-learning-skills/dot-claude
+cd claude-self-learning-skills
 ```
 
-### 6.3 Copy the files
+### 6.3 Run the installer
 
-**CAUTION:** Do not copy `CLAUDE.md` on top of your current file. Add its text to the end of your file.
-
-1. Make the folders:
+1. Type this command:
 
 ```bash
-mkdir -p ~/.claude/skills ~/.claude/backups
+./install.sh
 ```
 
-2. Copy the hooks, the scripts and the skill library files:
+2. If the installer asks for a git identity, type the command again with your name and your e-mail address:
 
 ```bash
-cp -R hooks skill-review ~/.claude/
-cp skills/README.md skills/REDIRECTS.md ~/.claude/skills/
+./install.sh --git-name "<your name>" --git-email "<your e-mail>"
 ```
 
-3. Add the rules to your `CLAUDE.md`:
+The installer does these steps:
 
-```bash
-cat CLAUDE.md >> ~/.claude/CLAUDE.md
-```
+1. It makes backups of `settings.json` and `CLAUDE.md` in `~/.claude/backups/`.
+2. It copies the hook and the scripts to `~/.claude/hooks/` and `~/.claude/skill-review/`.
+3. It makes `~/.claude/skills/` a git repository. It does not change your current skills.
+4. It adds the rules to `~/.claude/CLAUDE.md` between `<!-- self-learning-skills:start -->` and `<!-- self-learning-skills:end -->`.
+5. It adds the two hooks to `~/.claude/settings.json`. It keeps your other hooks.
 
-4. Make the shell scripts executable:
+**NOTE:** You can run the installer again, for example after an update. It replaces its own hooks and its own rules block. It does not make duplicates.
 
-```bash
-chmod +x ~/.claude/hooks/skill-learning-reminder.sh ~/.claude/skill-review/*.sh
-```
-
-### 6.4 Make the skill library a git repository
-
-1. Type these commands. Use your name and your e-mail address.
-
-```bash
-cd ~/.claude/skills
-git init -b main
-printf 'synced/\n.DS_Store\n' > .gitignore
-git config user.name "<your name>"
-git config user.email "<your e-mail>"
-git add -A
-git commit -m "Initialize personal skills repo"
-```
-
-**NOTE:** These `git config` commands change only this repository. They do not change your global git settings.
-
-### 6.5 Register the hooks
-
-1. Make a backup copy of the settings file:
-
-```bash
-cp ~/.claude/settings.json ~/.claude/backups/settings.json.before-skills
-```
-
-2. Add the `hooks` key from `dot-claude/settings.hooks.json` to `~/.claude/settings.json`.
-3. Make sure that the file is valid JSON:
-
-```bash
-jq empty ~/.claude/settings.json && echo valid
-```
-
-### 6.6 Make the weekly scheduled task
+### 6.4 Make the weekly scheduled task
 
 1. In a Claude Code session in the desktop app, ask Claude to make a scheduled task.
 2. Give Claude the name `weekly-skill-curator`, the prompt in `dot-claude/scheduled-tasks/weekly-skill-curator/SKILL.md` and the schedule `0 10 * * 1`.
@@ -446,9 +441,8 @@ git -C ~/.claude/skills revert <commit>
 
 ### 8.2 Stop the system
 
-1. Remove the `Stop` entry from `~/.claude/settings.json` to stop background reviews.
+1. Type `./install.sh --uninstall` in the repository folder. This removes the hooks and the rules block. It keeps your skills and logs.
 2. Pause the `weekly-skill-curator` task in the Claude app to stop the curator.
-3. Remove the `UserPromptSubmit` entry to stop the reminders.
 
 ---
 
