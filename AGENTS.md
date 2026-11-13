@@ -12,7 +12,7 @@ A Claude Code plugin, `self-learning-skills@self-learning-skills`, for all proje
 | --- | --- |
 | `SessionStart` hook | Gives Claude the rules for turning the user's corrections into skills in `~/.claude/skills/`. |
 | `UserPromptSubmit` hook | Adds a one-line "skill check" note to each message, and passes on notes from background reviews. |
-| `Stop` hook + background reviewer | After ~15 work steps, runs a reviewer in the background that may add or edit skills: in the Claude desktop app a `skill-reviewer` subagent of the session (a `PreToolUse` guard lets it touch only its own input and output file), elsewhere a tool-less `claude -p`. **Costs about USD 0.25–0.40 per review with Opus.** |
+| `Stop` hook + reviewer | In the Claude desktop app: the hook only records sessions, and a daily scheduled task runs `/self-learning-skills:review`, where `skill-reviewer` subagents review all sessions at once (a `PreToolUse` guard limits them to their input file, the skill library and their answer file). Elsewhere: after ~15 work steps, a tool-less `claude -p` in the background. Either may add or edit skills. **Costs about USD 0.25–0.40 per review with Opus.** |
 | `/self-learning-skills:setup` | One-time: makes `~/.claude/skills/` a git repository and asks which existing skills the system may manage. |
 | Ownership | The system changes only skills marked `metadata: created-by: self-learning-skills`; others stay read-only. |
 | `/self-learning-skills:curate` | On demand or scheduled: merges overlapping skills; old names stay reachable. |
@@ -94,6 +94,10 @@ Use the day and time from step 1. Use the first option that you can do.
    ```
    For a manual install, use `/bin/bash "$HOME/.claude/skill-review/curate.sh"` as the command instead.
 3. **Neither is possible:** tell the user to type `/self-learning-skills:curate` now and then.
+
+## Step 6b: schedule the daily review (Claude desktop app only)
+
+If you have a scheduled-task tool, create a task named `daily-skill-review` with the prompt `/self-learning-skills:review` and the cron expression `0 20 * * *` (or a time the user names). A missed run starts when the app opens. Without this task, the desktop app records sessions but never reviews them.
 
 ## Step 7: report to the user
 

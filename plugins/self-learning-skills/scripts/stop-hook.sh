@@ -1,8 +1,8 @@
 #!/bin/bash
 # Stop hook: after a reply is delivered, count work steps since the last skill review.
-# When they reach the threshold, start the reviewer and return at once: a detached `claude -p`
-# (cli runner), or (agent runner, the desktop default) a block decision that asks this session
-# to start the skill-reviewer subagent in the background. See runner() in lib.sh.
+# When they reach the threshold, start a detached `claude -p` reviewer and return at once.
+# Agent runner (the desktop default, see runner() in lib.sh): only remember the transcript; the
+# daily /self-learning-skills:review run (batch-review.sh) reviews all sessions at once.
 # Modeled on Hermes Agent's skills.creation_nudge_interval + background review.
 # A work step = one model response that called at least one tool (parallel calls count once),
 # like Hermes's tool-calling iterations. Every tool counts, MCP tools included, except the
@@ -23,7 +23,6 @@ tp=$(jq -r '.transcript_path // empty' <<<"$input")
 [ -n "$sid" ] && [ -f "$tp" ] || exit 0
 
 mkdir -p "$STATE/state" "$STATE/logs"
-apply_pending   # answers that review subagents wrote since the last reply
 st="$STATE/state/$sid"
 last=$(cat "$st.line" 2>/dev/null || echo 0)
 total=$(wc -l <"$tp" | tr -d ' ')
@@ -44,6 +43,12 @@ read -r count touched < <(tail -n +"$((last + 1))" "$tp" | jq -R -n -r --arg ign
     | any) as $s
   | "\($n) \($s)"')
 
+if [ "$(runner)" = agent ]; then   # record only: no model call, no extra turn
+  echo "$tp" >"$st.tp"
+  [ "$touched" = true ] && echo "$total" >"$st.line"
+  exit 0
+fi
+
 if [ "$touched" = true ]; then
   echo "$total" >"$st.line"
   exit 0
@@ -52,15 +57,5 @@ fi
 
 mkdir "$st.lock" 2>/dev/null || exit 0   # a review for this session is already running
 echo "$total" >"$st.line"
-if [ "$(runner)" = cli ]; then
-  nohup "$CODE/run-review.sh" "$sid" "$tp" "$last" </dev/null >/dev/null 2>&1 &
-  exit 0
-fi
-
-log=$("$CODE/run-review.sh" "$sid" "$tp" "$last" --prepare) && [ -s "$log.prompt.txt" ] || { rmdir "$st.lock"; exit 0; }
-echo "$log" >"$st.pending"
-model=$(agent_model "${SKILL_REVIEW_MODEL:-claude-opus-5-5}")
-reason="Self-learning skills: a background skill review is due. Make exactly one Agent tool call now, with subagent_type \"self-learning-skills:skill-reviewer\", model \"$model\", run_in_background true, description \"Background skill review\", and this prompt, verbatim: \"Input: $log.prompt.txt
-Output: $log.answer.md\". Then end your turn without any text. When its completion notification arrives, reply with nothing; the plugin applies the result and the user gets a one-line note with the next message."
-jq -n --arg r "$reason" '{decision: "block", reason: $r}'
+nohup "$CODE/run-review.sh" "$sid" "$tp" "$last" </dev/null >/dev/null 2>&1 &
 exit 0

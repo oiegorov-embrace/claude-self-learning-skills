@@ -18,9 +18,11 @@ manual_also_installed() {
 # That can be its own repo or a bigger one (for example a versioned ~/.claude).
 library_ready() { [ -d "$SKILLS" ] && [ "$(git -C "$SKILLS" rev-parse --is-inside-work-tree 2>/dev/null)" = true ]; }
 
-# Who runs the reviewer and the curator. "agent": a background subagent of the current session
-# (agents/skill-reviewer.md), so it uses the session's own sign-in. "cli": a headless `claude -p`,
-# which needs its own CLI sign-in. Default: agent inside the Claude desktop app, cli elsewhere.
+# Who runs the reviewer and the curator. "agent": the skill-reviewer subagent (agents/
+# skill-reviewer.md) of an app session, so it uses the app's own sign-in; reviews then run once a
+# day for all sessions (batch-review.sh, started by /self-learning-skills:review from a scheduled
+# task). "cli": a headless `claude -p` every SKILL_REVIEW_THRESHOLD work steps, which needs its own
+# CLI sign-in. Default: agent inside the Claude desktop app, cli elsewhere.
 # Override with SKILL_REVIEW_RUNNER=agent|cli in the env of settings.json.
 runner() {
   case "${SKILL_REVIEW_RUNNER:-}" in
@@ -34,33 +36,28 @@ agent_model() {
   case "$1" in *haiku*) echo haiku ;; *sonnet*) echo sonnet ;; *fable*) echo fable ;; *) echo opus ;; esac
 }
 
-# Apply the reviewer answers that background subagents wrote since the last hook run
-# (agent runner). A pending review is "<state>/<sid>.pending" holding its log path; the
-# subagent writes "<log>.answer.md". One that has no answer after 3 hours is dropped
-# with a note. Called by the Stop and UserPromptSubmit hooks.
-apply_pending() {
-  local p log
-  for p in "$STATE"/state/*.pending; do
-    [ -f "$p" ] || continue
-    log=$(cat "$p")
-    if [ -s "$log.answer.md" ]; then
-      apply_review "$log" "$log.answer.md"
-    elif [ -n "$(find "$p" -mmin +180 2>/dev/null)" ]; then
-      echo "$(date '+%Y-%m-%d %H:%M')	Background skill review did not finish (no answer in 3 hours); see $log.prompt.txt" >>"$STATE/notices.pending"
-    else
-      continue
-    fi
-    rm -f "$p"; rmdir "${p%.pending}.lock" 2>/dev/null
-  done
-}
-
 # Apply one reviewer answer (claude -p JSON or the subagent's Markdown) and queue the note.
 apply_review() {   # <log prefix> <answer file>
   local summary
   if summary=$(/usr/bin/python3 -I "$CODE/apply-changes.py" "$2" "$SKILLS" 2>>"$1.err"); then
     [ "$summary" != "Nothing to save." ] && echo "$(date '+%Y-%m-%d %H:%M')	$summary" >>"$STATE/notices.pending"
+    echo "$summary"
   else
     echo "$(date '+%Y-%m-%d %H:%M')	Background skill review failed; see $1.err" >>"$STATE/notices.pending"
+    echo "Background skill review failed; see $1.err"
+    return 1
   fi
-  return 0
+}
+
+digest() {   # transcript lines on stdin -> readable conversation
+  jq -R -r 'fromjson? | select(.isSidechain | not) |
+    if .type == "user" then
+      (.message.content | if type == "string" then . else (map(select(.type == "text") | .text) | join("\n")) end)
+      | select(length > 0) | "USER: " + .[0:3000]
+    elif .type == "assistant" then
+      .message.content[]? |
+      if .type == "text" then "CLAUDE: " + .text[0:2000]
+      elif .type == "tool_use" then "  [tool " + .name + "] " + ((.input | tostring)[0:300])
+      else empty end
+    else empty end'
 }

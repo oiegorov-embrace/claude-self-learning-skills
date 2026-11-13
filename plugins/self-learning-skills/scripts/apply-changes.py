@@ -60,12 +60,32 @@ def main(out_path: str, skills_dir: str) -> None:
         target.write_text(content)
         written.append(rel)
 
+    # Edits (daily batch): replace one exact, unique piece of text in an existing managed file.
+    for e in changes.get("edits") or []:
+        rel = str(e.get("path", ""))
+        old, new = str(e.get("old", "")), str(e.get("new", ""))
+        target = (root / rel).resolve()
+        skill = root / rel.split("/")[0]
+        if not ALLOWED.match(rel) or rel.split("/")[0] in ("synced",) or root not in target.parents:
+            print(f"skipped disallowed edit path: {rel!r}", file=sys.stderr)
+            continue
+        if not target.is_file() or not (skill / "SKILL.md").exists() or not is_managed(skill):
+            print(f"skipped edit of a missing or read-only file: {rel!r}", file=sys.stderr)
+            continue
+        text = target.read_text()
+        if not old or text.count(old) != 1:
+            print(f"skipped edit of {rel!r}: the old text occurs {text.count(old) if old else 0} times, not once", file=sys.stderr)
+            continue
+        target.write_text(text.replace(old, new, 1))
+        if rel not in written:
+            written.append(rel)
+
     if written:
         git = ["git", "-C", str(root)]
         subprocess.run(git + ["add", "--"] + written, check=True)
         subprocess.run(git + ["commit", "-q", "-m", f"{summary} (background review)", "--"] + written, check=True)
-    elif files:
-        sys.exit("reviewer proposed changes but none had an allowed path")
+    elif files or changes.get("edits"):
+        sys.exit("reviewer proposed changes but none could be applied")
     print(summary)
 
 
