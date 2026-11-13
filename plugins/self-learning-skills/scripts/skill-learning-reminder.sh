@@ -11,6 +11,7 @@ manual_also_installed && exit 0
 ctx="Skill check (see the 'Self-learning skills' rules): if this message corrects or extends how we do a recurring activity, update the matching skill in ~/.claude/skills, or create one if none exists; then commit and tell the user in one line. Otherwise ignore this note."
 
 R="$STATE"
+library_ready && apply_pending   # answers that review subagents wrote (agent runner)
 if [ -s "$R/notices.pending" ] && mv "$R/notices.pending" "$R/notices.taking.$$" 2>/dev/null; then
   notes=$(cut -f2- "$R/notices.taking.$$")
   cat "$R/notices.taking.$$" >>"$R/notices.seen" && rm -f "$R/notices.taking.$$"

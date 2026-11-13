@@ -3,14 +3,16 @@
 # asks a headless, tool-less Claude for skill changes,
 # applies them with apply-changes.py (which commits), and queues a one-line note
 # that the UserPromptSubmit hook shows on the user's next message.
-# Usage: run-review.sh <session_id> <transcript_path> <last_reviewed_line>
+# Usage: run-review.sh <session_id> <transcript_path> <last_reviewed_line> [--prepare]
+# --prepare (agent runner): only write <log>.prompt.txt, print <log>, keep the lock; the
+# subagent writes <log>.answer.md and apply_pending (lib.sh) applies it.
 
-sid="$1"; tp="$2"; last="${3:-0}"
+sid="$1"; tp="$2"; last="${3:-0}"; prepare="${4:-}"
 . "$(dirname "$0")/lib.sh"
 MODEL="${SKILL_REVIEW_MODEL:-claude-opus-5-5}"
 CLAUDE_BIN="$(command -v claude || echo "$HOME/.local/bin/claude")"
 log="$STATE/logs/$(date +%Y%m%d-%H%M%S)-$sid"
-trap 'rmdir "$STATE/state/$sid.lock" 2>/dev/null' EXIT
+[ "$prepare" = --prepare ] || trap 'rmdir "$STATE/state/$sid.lock" 2>/dev/null' EXIT
 
 digest() {   # transcript lines on stdin -> readable conversation
   jq -R -r 'fromjson? | select(.isSidechain | not) |
@@ -50,6 +52,8 @@ digest() {   # transcript lines on stdin -> readable conversation
   echo "</transcript>"
 } >"$log.prompt.txt"
 
+if [ "$prepare" = --prepare ]; then echo "$log"; exit 0; fi
+
 SKILL_REVIEWER=1 "$CLAUDE_BIN" -p \
   --model "$MODEL" \
   --tools "" \
@@ -57,8 +61,4 @@ SKILL_REVIEWER=1 "$CLAUDE_BIN" -p \
   --output-format json \
   <"$log.prompt.txt" >"$log.json" 2>"$log.err"
 
-if summary=$(/usr/bin/python3 -I "$CODE/apply-changes.py" "$log.json" "$SKILLS" 2>>"$log.err"); then
-  [ "$summary" != "Nothing to save." ] && echo "$(date '+%Y-%m-%d %H:%M')	$summary" >>"$STATE/notices.pending"
-else
-  echo "$(date '+%Y-%m-%d %H:%M')	Background skill review failed; see $log.err" >>"$STATE/notices.pending"
-fi
+apply_review "$log" "$log.json"

@@ -17,6 +17,7 @@ EOF
 chmod +x "$STUB/claude"
 export HOME="$H" CLAUDE_PLUGIN_ROOT="$PLUG" CLAUDE_PLUGIN_DATA="$DATA" PATH="$STUB:$PATH" GIT_CONFIG_NOSYSTEM=1
 unset SKILL_REVIEWER SKILLS_DIR
+export SKILL_REVIEW_RUNNER=cli   # this file tests the cli runner; tests/agent-runner.sh tests the other
 S="$PLUG/scripts"
 pass=0; fail=0
 ok() { if eval "$2"; then echo "PASS $1"; pass=$((pass+1)); else echo "FAIL $1"; fail=$((fail+1)); fi; }

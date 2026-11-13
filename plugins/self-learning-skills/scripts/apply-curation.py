@@ -1,6 +1,6 @@
 """Apply the curator's <curation> block: merge skills, keeping every old name reachable.
 
-Usage: python3 -I apply-curation.py <curator-json-output> <skills-dir> [redirect-hook]
+Usage: python3 -I apply-curation.py <curator-json-output | answer.md> <skills-dir> [redirect-hook]
 For each merge: writes the survivor's SKILL.md (forcing a "Formerly: ..." alias into its
 description), moves the retired skills' support files into the survivor, archives the
 retired folders under .archive/, appends rows to REDIRECTS.md, commits, and calls
@@ -55,7 +55,9 @@ def move_support_files(src: Path, dst: Path, old: str) -> None:
 
 
 def main(out_path: str, skills_dir: str, hook: str | None) -> None:
-    result = json.loads(Path(out_path).read_text()).get("result") or ""
+    text = Path(out_path).read_text()
+    # The cli runner leaves claude -p JSON; the agent runner leaves the subagent's Markdown answer.
+    result = text if out_path.endswith(".md") else (json.loads(text).get("result") or "")
     blocks = re.findall(r"<curation>\s*(.*?)\s*</curation>", result, re.S)
     if not blocks:
         sys.exit("no <curation> block in curator output")

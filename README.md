@@ -68,6 +68,7 @@ This design copies the "learning loop" of Hermes Agent (Nous Research).
 - Each skill change is a git commit. You can see each change. You can undo each change.
 - The background work does not make you wait.
 - The reviewer and the curator cannot run commands. Text in a session cannot make them do dangerous actions.
+- In the Claude desktop app, the reviewer and the curator run as a subagent of your session. They use the app's sign-in, so no separate `claude` CLI sign-in is necessary.
 
 ---
 
@@ -78,7 +79,8 @@ This design copies the "learning loop" of Hermes Agent (Nous Research).
 | Rules hook | `SessionStart` hook | Each session start and each compaction | Gives Claude the rules for skills. |
 | Reminder hook | `UserPromptSubmit` hook | Each user message | Reminds Claude of the rules. Gives Claude the notes from background work. |
 | Review trigger | `Stop` hook | After each Claude reply | Counts work steps. At 15 work steps, starts the reviewer. |
-| Reviewer | Headless `claude -p`, no tools | In the background | Examines the session. Writes skill changes as JSON. |
+| Reviewer | Desktop app: the `skill-reviewer` subagent, which a guard hook limits to one input file and one output file. Elsewhere: headless `claude -p`, no tools | In the background | Examines the session. Writes skill changes as JSON. |
+| Reviewer guard | `PreToolUse` hook | Each tool call | Inside the `skill-reviewer` subagent, permits only a Read of its input file and a Write of its output file. Does nothing elsewhere. |
 | Apply script | Python | After the reviewer | Writes the JSON changes to the skill library. Makes a commit. |
 | Setup skill | `/self-learning-skills:setup` | One time, after the installation | Makes the skill library a git repository. |
 | Curator skill | `/self-learning-skills:curate` | When you start it, or from a schedule | Finds skills that are almost the same. Merges them. Keeps the old names. |
@@ -225,8 +227,10 @@ flowchart TD
 2. The hook counts the work steps after the last review position.
 3. If Claude changed a skill in that period, the hook moves the review position and stops.
 4. If the count is less than 15, the hook stops.
-5. If the count is 15 or more, the hook starts `run-review.sh` in the background. The hook stops immediately.
-6. The reviewer gets the instructions, all skills and the session text. It has no tools.
+5. If the count is 15 or more, the hook starts the reviewer and stops immediately:
+   - In the desktop app (the agent runner), `run-review.sh --prepare` writes the input file. The hook then asks Claude to start the `skill-reviewer` subagent in the background. The subagent writes its answer file. The next `Stop` or `UserPromptSubmit` hook applies it.
+   - Elsewhere (the cli runner), the hook starts `run-review.sh` in the background, which calls `claude -p`.
+6. The reviewer gets the instructions, all skills and the session text. It cannot run commands.
 7. The reviewer writes a `<skill-changes>` JSON block.
 8. `apply-changes.py` writes the permitted files and makes a commit.
 9. The runner writes a one-line note to `notices.pending`. Section 5.3 shows the note to you.
@@ -343,6 +347,7 @@ The test uses a temporary home folder and a test `claude` program. It does not c
 | `SKILL_REVIEW_IGNORE_TOOLS` | `env` in `settings.json` | `^(mcp__ccd_turn__.*\|ToolSearch)$` | Regular expression. The hook does not count the tools that agree with it. |
 | `SKILL_REVIEW_MODEL` | `env` in `settings.json` | `claude-opus-5-5` | Model for the reviewer. `claude-sonnet-5-5` costs less. |
 | `CURATOR_MODEL` | `env` in `settings.json` | `claude-opus-5-5` | Model for the curator |
+| `SKILL_REVIEW_RUNNER` | `env` in `settings.json` | `agent` in the desktop app, `cli` elsewhere | `agent`: a subagent of your session, with the session's sign-in. `cli`: a headless `claude -p`, which needs its own CLI sign-in. |
 
 ### 8.1 Undo a skill change
 
@@ -385,7 +390,8 @@ In this table, `<data>` is `~/.claude/plugins/data/self-learning-skills-self-lea
 | --- | --- | --- |
 | Claude says "SETUP NEEDED" | The skill library is not a git repository | Type `/self-learning-skills:setup`. |
 | Claude says the plugin is inactive | The manual installation is also registered | Remove one of them (section 8.2). |
-| Note says "Background skill review failed" | The headless `claude` did not start, or it gave no JSON block | Read the `.err` and `.json` files in `<data>/logs/`. |
+| Note says "Background skill review failed" | The reviewer gave no JSON block. With the cli runner, the headless `claude` maybe did not start: an expired CLI sign-in shows as "OAuth session expired" in the `.json` file | Read the `.err`, `.json` and `.answer.md` files in `<data>/logs/`. In the desktop app, remove `SKILL_REVIEW_RUNNER=cli`, or sign in to the CLI again. |
+| Note says "Background skill review did not finish" | Claude did not start the subagent, or the subagent wrote no answer in 3 hours | Read `<data>/logs/<log>.prompt.txt`. The next review starts normally. |
 | No review after a long task | The count is less than 15, or Claude changed a skill in that period | Examine `<data>/state/<session-id>.line`. |
 | A review never starts again | A lock folder stayed after a crash | Remove `<data>/state/<session-id>.lock`. |
 | The curator never starts | A lock folder stayed after a crash | Remove `<data>/curator.lock`. |

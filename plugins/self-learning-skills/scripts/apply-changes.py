@@ -1,6 +1,6 @@
 """Apply the background reviewer's <skill-changes> block to the skill library and commit.
 
-Usage: python3 -I apply-changes.py <reviewer-json-output> <skills-dir>
+Usage: python3 -I apply-changes.py <reviewer-json-output | answer.md> <skills-dir>
 Prints the one-line summary on success, or exits non-zero with a reason on stderr.
 """
 import json
@@ -16,7 +16,9 @@ ALLOWED = re.compile(r"^[a-z0-9][a-z0-9-]*/(SKILL\.md|(references|templates|scri
 
 
 def main(out_path: str, skills_dir: str) -> None:
-    result = json.loads(Path(out_path).read_text()).get("result") or ""
+    text = Path(out_path).read_text()
+    # The cli runner leaves claude -p JSON; the agent runner leaves the subagent's Markdown answer.
+    result = text if out_path.endswith(".md") else (json.loads(text).get("result") or "")
     blocks = re.findall(r"<skill-changes>\s*(.*?)\s*</skill-changes>", result, re.S)
     if not blocks:
         sys.exit("no <skill-changes> block in reviewer output")
